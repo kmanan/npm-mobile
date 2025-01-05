@@ -1,16 +1,67 @@
-# npm_phone_app
+# NPM Mobile Manager
 
-A new Flutter project.
+A Flutter-based mobile application for managing your Nginx Proxy Manager instances on the go. This app provides a convenient way to monitor and manage your proxy hosts from your mobile device.
 
-## Getting Started
+## About
 
-This project is a starting point for a Flutter application.
+This app is a mobile client for [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager), an easy-to-use proxy host manager with SSL support. While the original project provides a web interface, this mobile app brings that functionality to your pocket.
 
-A few resources to get you started if this is your first Flutter project:
+Fully built using Cursor.AI
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Features
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Connect to your Nginx Proxy Manager instance
+- Secure authentication
+- View all proxy hosts
+- Monitor proxy host status
+- Save server URL for quick access
+- Mobile-optimized interface
+
+## Installation
+
+Download the latest APK from the releases section and install it on your Android device.
+
+### Requirements
+
+- Android 5.0 or higher
+- Active Nginx Proxy Manager instance
+- Network access to your NPM server
+
+## Usage
+
+1. Launch the app
+2. Enter your NPM server URL (e.g., `example.com:81` or `192.168.1.100:81`)
+3. Log in with your NPM credentials
+4. View and monitor your proxy hosts
+
+## Building from Source
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/npm-mobile.git
+   ```
+
+2. Install dependencies
+   ```bash
+   flutter pub get
+   ```
+
+3. Build the release APK
+   ```bash
+   flutter build apk --release
+   ```
+
+## Credits
+
+- [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager) - The awesome project this app is built for
+- Built with [Flutter](https://flutter.dev)
+- Cursor.AI (https://cursor.ai)
+- VS Code
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This is an unofficial mobile client for Nginx Proxy Manager. It is not affiliated with or endorsed by the Nginx Proxy Manager project.
