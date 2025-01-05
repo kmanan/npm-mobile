@@ -1,0 +1,30 @@
+com.example.npm_phone_app-jetified-lifecycle-livedata-core-ktx-2.7.0-0 C:\Users\manan\.gradle\caches\transforms-3\0de17772136f5bb97abbac18bf19952c\transformed\jetified-lifecycle-livedata-core-ktx-2.7.0\res
+com.example.npm_phone_app-jetified-core-1.0.0-1 C:\Users\manan\.gradle\caches\transforms-3\0f4898e547ce6556af81b41f8600d00d\transformed\jetified-core-1.0.0\res
+com.example.npm_phone_app-jetified-annotation-experimental-1.4.0-2 C:\Users\manan\.gradle\caches\transforms-3\1a6f31e9d69d512baddecc81d3d2cdd8\transformed\jetified-annotation-experimental-1.4.0\res
+com.example.npm_phone_app-jetified-window-java-1.2.0-3 C:\Users\manan\.gradle\caches\transforms-3\23a119c914a443fc27671333969ff46b\transformed\jetified-window-java-1.2.0\res
+com.example.npm_phone_app-jetified-tracing-1.2.0-4 C:\Users\manan\.gradle\caches\transforms-3\2cad7c93f19c5d1bde88c6176894d9e6\transformed\jetified-tracing-1.2.0\res
+com.example.npm_phone_app-lifecycle-runtime-2.7.0-5 C:\Users\manan\.gradle\caches\transforms-3\35bfb46fee22dd92e50e34e88b65d220\transformed\lifecycle-runtime-2.7.0\res
+com.example.npm_phone_app-jetified-security-crypto-1.1.0-alpha06-6 C:\Users\manan\.gradle\caches\transforms-3\6bd76d49b732ef24e70d092f73b2580c\transformed\jetified-security-crypto-1.1.0-alpha06\res
+com.example.npm_phone_app-lifecycle-livedata-2.7.0-7 C:\Users\manan\.gradle\caches\transforms-3\769acfa0e4ea1f6081b774bbf86a2d64\transformed\lifecycle-livedata-2.7.0\res
+com.example.npm_phone_app-fragment-1.7.1-8 C:\Users\manan\.gradle\caches\transforms-3\7a892b268cd2a790e51490e2b7285401\transformed\fragment-1.7.1\res
+com.example.npm_phone_app-jetified-lifecycle-viewmodel-savedstate-2.7.0-9 C:\Users\manan\.gradle\caches\transforms-3\81748deddad26455ee8caab95deac2c6\transformed\jetified-lifecycle-viewmodel-savedstate-2.7.0\res
+com.example.npm_phone_app-jetified-activity-1.8.1-10 C:\Users\manan\.gradle\caches\transforms-3\87f9adec6a14b0af16f5b8405046bd49\transformed\jetified-activity-1.8.1\res
+com.example.npm_phone_app-jetified-core-ktx-1.13.1-11 C:\Users\manan\.gradle\caches\transforms-3\a5f68ab416789005f94320e6ba92c0c2\transformed\jetified-core-ktx-1.13.1\res
+com.example.npm_phone_app-core-1.13.1-12 C:\Users\manan\.gradle\caches\transforms-3\ac98255814564f615e42cfffee873332\transformed\core-1.13.1\res
+com.example.npm_phone_app-jetified-savedstate-1.2.1-13 C:\Users\manan\.gradle\caches\transforms-3\b98ee462a848e79f0255eb66ef9b3ab9\transformed\jetified-savedstate-1.2.1\res
+com.example.npm_phone_app-core-runtime-2.2.0-14 C:\Users\manan\.gradle\caches\transforms-3\c4d77209859fa19e155750e2773667d9\transformed\core-runtime-2.2.0\res
+com.example.npm_phone_app-jetified-window-1.2.0-15 C:\Users\manan\.gradle\caches\transforms-3\c56a8b5d9a0a4f8909c125284e4c1cf1\transformed\jetified-window-1.2.0\res
+com.example.npm_phone_app-lifecycle-livedata-core-2.7.0-16 C:\Users\manan\.gradle\caches\transforms-3\e44a06f16038700716390670fa25ac4d\transformed\lifecycle-livedata-core-2.7.0\res
+com.example.npm_phone_app-lifecycle-viewmodel-2.7.0-17 C:\Users\manan\.gradle\caches\transforms-3\eda9b1f78b4bb770653f68fc2d40f083\transformed\lifecycle-viewmodel-2.7.0\res
+com.example.npm_phone_app-jetified-lifecycle-process-2.7.0-18 C:\Users\manan\.gradle\caches\transforms-3\f4363ea6980408c2659aa6a9293acf53\transformed\jetified-lifecycle-process-2.7.0\res
+com.example.npm_phone_app-jetified-startup-runtime-1.1.1-19 C:\Users\manan\.gradle\caches\transforms-3\f4deb0a40559c499339346d1a051e751\transformed\jetified-startup-runtime-1.1.1\res
+com.example.npm_phone_app-jetified-profileinstaller-1.3.1-20 C:\Users\manan\.gradle\caches\transforms-3\fc676574caeba97409c7e78e4f0a0000\transformed\jetified-profileinstaller-1.3.1\res
+com.example.npm_phone_app-packaged_res-21 C:\Users\manan\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_secure_storage-9.2.3\android\build\intermediates\packaged_res\debug
+com.example.npm_phone_app-packaged_res-22 C:\Users\manan\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.15\android\build\intermediates\packaged_res\debug
+com.example.npm_phone_app-pngs-23 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\build\generated\res\pngs\debug
+com.example.npm_phone_app-resValues-24 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\build\generated\res\resValues\debug
+com.example.npm_phone_app-packageDebugResources-25 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.example.npm_phone_app-packageDebugResources-26 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.example.npm_phone_app-merged_res-27 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\build\intermediates\merged_res\debug
+com.example.npm_phone_app-debug-28 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\src\debug\res
+com.example.npm_phone_app-main-29 E:\App Dev\NPM iPhone App\npm_phone_app\android\app\src\main\res
