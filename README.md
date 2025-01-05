@@ -6,6 +6,10 @@ A Flutter-based mobile application for managing your Nginx Proxy Manager instanc
 
 [⬇️ Download Latest APK](https://github.com/kmanan/npm-mobile/releases/latest)
 
+## Screenshots
+
+![image](https://github.com/user-attachments/assets/952e3700-7c7b-4df7-a688-bb14810b6c5c) ![image](https://github.com/user-attachments/assets/68af0ad6-a168-4e8e-aead-3adde0f2da40)
+
 ## About
 
 This app is a mobile client for [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager), an easy-to-use proxy host manager with SSL support. While the original project provides a web interface, this mobile app brings that functionality to your pocket.
