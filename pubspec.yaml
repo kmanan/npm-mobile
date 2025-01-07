@@ -2,7 +2,7 @@ name: npm_phone_app
 description: "A new Flutter project for Nginx Proxy Manager"
 publish_to: 'none'
 
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -26,6 +26,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
 # Add this section at the root level (same indentation as dev_dependencies)
 flutter_launcher_icons:
   android: true
