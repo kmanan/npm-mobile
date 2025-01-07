@@ -1,4 +1,4 @@
-package com.example.npm_phone_app
+package com.manan.npm_phone_app
 
 import io.flutter.embedding.android.FlutterActivity
 

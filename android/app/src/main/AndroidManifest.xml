@@ -2,7 +2,8 @@
     <application
         android:label="npm_phone_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        package="com.manan.npm_phone_app">
         <activity
             android:name=".MainActivity"
             android:exported="true"
