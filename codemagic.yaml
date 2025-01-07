@@ -1,0 +1,28 @@
+workflows:
+  ios-release:
+    name: iOS Release    # You can keep this name as is
+    instance_type: mac_mini_m1    # Keep this as is
+    environment:
+      ios_signing:
+        distribution_type: app_store    # Keep this as is
+        bundle_identifier: com.manan.npmphoneapp    # CHANGE THIS to your bundle ID we created earlier
+    scripts:
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files $(BUNDLE_ID) \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+      - name: Flutter build
+        script: |
+          flutter build ipa --release \
+            --build-number=$(($(app-store-connect get-latest-app-store-build-number "$BUNDLE_ID") + 1))
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        # These three values will use the environment variables we just set up
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY      # Keep this as is
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER    # Keep this as is
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID      # Keep this as is
