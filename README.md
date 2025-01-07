@@ -2,6 +2,9 @@
 
 A Flutter-based mobile application for managing your Nginx Proxy Manager instances on the go. This app provides a convenient way to monitor and manage your proxy hosts from your mobile device.
 
+![Static Badge](https://img.shields.io/badge/demo-red?link=https%3A%2F%2Fyoutube.com%2Fshorts%2FzxFZrzZiYwc%3Ffeature%3Dshare)
+
+
 ## Download
 
 [⬇️ Download Latest APK](https://github.com/kmanan/npm-mobile/releases/latest)
