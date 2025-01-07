@@ -4,7 +4,7 @@ A Flutter-based mobile application for managing your Nginx Proxy Manager instanc
 
 ## YouTube Demo
 
-![Static Badge](https://img.shields.io/badge/demo-red?link=https%3A%2F%2Fyoutube.com%2Fshorts%2FzxFZrzZiYwc%3Ffeature%3Dshare)
+[![Watch the video](https://img.shields.io/badge/Watch%20the%20video-YouTube-red)](https://www.youtube.com/shorts/zxFZrzZiYwc)
 
 ## Demo Credentials:
 Server: Any IP
