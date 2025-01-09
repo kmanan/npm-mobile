@@ -44,115 +44,128 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Dismiss keyboard when tapping outside
         FocusScope.of(context).unfocus();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Login to NPM'),
-        ),
         body: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextFormField(
-                    controller: _serverController,
-                    focusNode: _serverFocusNode,
-                    decoration: InputDecoration(
-                      labelText: 'Server URL',
-                      hintText: 'example.com or 192.168.1.1',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.paste),
-                            onPressed: !_isLoading ? _pasteServerUrl : null,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: !_isLoading ? _clearServerUrl : null,
-                          ),
-                        ],
-                      ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 40),
+                    Image.asset(
+                      'assets/icon/icon.png',
+                      width: 100,
+                      height: 100,
                     ),
-                    enabled: !_isLoading,
-                    textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) {
-                      FocusScope.of(context).requestFocus(_emailFocusNode);
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter server URL';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-TextFormField(
-  controller: _emailController,
-  decoration: const InputDecoration(
-    labelText: 'Email',
-    border: OutlineInputBorder(),
-  ),
-  keyboardType: TextInputType.emailAddress,
-  enabled: !_isLoading,
-  showCursor: true,  // Add this line
-  readOnly: false,   // Add this line
-  validator: (value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your email';
-    }
-    return null;
-  },
-),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    focusNode: _passwordFocusNode,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.paste),
-                        onPressed: !_isLoading ? _pastePassword : null,
-                      ),
-                    ),
-                    obscureText: true,
-                    enabled: !_isLoading,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!_isLoading) _handleLogin();
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                    const SizedBox(height: 16),
+                    Text(
+                      'Nginx Mobile Dashboard',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
                               ),
-                            )
-                          : const Text('Login'),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 40),
+                    TextFormField(
+                      controller: _serverController,
+                      focusNode: _serverFocusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Server URL',
+                        hintText: 'example.com or 192.168.1.1',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.paste),
+                              onPressed: !_isLoading ? _pasteServerUrl : null,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: !_isLoading ? _clearServerUrl : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                      enabled: !_isLoading,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_emailFocusNode);
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter server URL';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      enabled: !_isLoading,
+                      showCursor: true, // Add this line
+                      readOnly: false, // Add this line
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _passwordController,
+                      focusNode: _passwordFocusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.paste),
+                          onPressed: !_isLoading ? _pastePassword : null,
+                        ),
+                      ),
+                      obscureText: true,
+                      enabled: !_isLoading,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!_isLoading) _handleLogin();
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleLogin,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Login'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -205,8 +218,9 @@ TextFormField(
       if (!mounted) return;
 
       if (success) {
-        await _storage.write(key: 'server_url', value: _serverController.text.trim());
-        
+        await _storage.write(
+            key: 'server_url', value: _serverController.text.trim());
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const DashboardScreen(),
