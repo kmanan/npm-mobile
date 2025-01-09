@@ -13,8 +13,13 @@ class NginxProxyManagerApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nginx Proxy Manager',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: Colors.black,
+        colorScheme: const ColorScheme.dark(
+          background: Colors.black,
+          surface: Colors.black,
+          primary: Colors.white,
+        ),
       ),
       home: const LoginScreen(),
     );

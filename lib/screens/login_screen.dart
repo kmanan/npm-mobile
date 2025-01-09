@@ -47,6 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
         FocusScope.of(context).unfocus();
       },
       child: Scaffold(
+        backgroundColor: Colors.black,
         body: SingleChildScrollView(
           child: SafeArea(
             child: Padding(

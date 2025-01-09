@@ -58,8 +58,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Nginx Proxy Manager'),
+        backgroundColor: Colors.black,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/icon/icon.png',
+              width: 30, // Smaller size for AppBar
+              height: 30,
+            ),
+            const SizedBox(width: 8), // Space between icon and text
+            const Text('Nginx Mobile Dashboard'),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
