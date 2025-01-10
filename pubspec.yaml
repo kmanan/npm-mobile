@@ -1,8 +1,8 @@
 name: npm_phone_app
-description: "A new Flutter project for Nginx Proxy Manager"
+description: "Nginx Mobile Dashboard - A mobile client for Nginx Proxy Manager"
 publish_to: 'none'
 
-version: 1.0.0+5
+version: 1.0.0+8
 
 environment:
   sdk: '>=3.2.3 <4.0.0'

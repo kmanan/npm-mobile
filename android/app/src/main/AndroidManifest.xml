@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="npm_phone_app"
+        android:label="Nginx Mobile Dashboard"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         package="com.manan.npm_phone_app">
