@@ -52,6 +52,7 @@ class ApiService {
   Future<String?> getSavedServerUrl() async {
     return await _storage.read(key: 'server_url');
   }
+
   Future<bool> checkDemoMode() async {
     final token = await _storage.read(key: 'auth_token');
     isDemoMode = token == 'demo_token';
@@ -62,7 +63,7 @@ class ApiService {
   Future<bool> login(String serverUrl, String email, String password) async {
     try {
       print('Login attempt with: $email'); // Debug print
-      
+
       // Demo mode check
       if (email == "demo@playstore.com" && password == "demopass123") {
         print('Setting demo mode to true'); // Debug print
@@ -76,7 +77,7 @@ class ApiService {
       if (!isDemoMode) {
         updateBaseUrl(serverUrl);
         await saveServerUrl(serverUrl);
-        
+
         final response = await _dio.post(
           '/api/tokens',
           data: {
@@ -90,12 +91,14 @@ class ApiService {
         );
 
         if (response.statusCode == 200 && response.data['token'] != null) {
-          await _storage.write(key: 'auth_token', value: response.data['token']);
-          _dio.options.headers['Authorization'] = 'Bearer ${response.data['token']}';
+          await _storage.write(
+              key: 'auth_token', value: response.data['token']);
+          _dio.options.headers['Authorization'] =
+              'Bearer ${response.data['token']}';
           return true;
         }
       }
-      
+
       return false;
     } catch (e) {
       print('Login error: $e');
@@ -137,7 +140,6 @@ class ApiService {
         ];
       }
 
-
       // Only try API call if not in demo mode
       final token = await _storage.read(key: 'auth_token');
       if (token == null) throw Exception('No auth token found');
@@ -157,6 +159,33 @@ class ApiService {
     } catch (e) {
       print('Error fetching proxy hosts: $e');
       return [];
+    }
+  }
+
+  Future<bool> toggleProxyHost(int hostId, bool enabled) async {
+    try {
+      if (isDemoMode) {
+        // In demo mode, just return true to simulate success
+        return true;
+      }
+
+      final token = await _storage.read(key: 'auth_token');
+      if (token == null) throw Exception('No auth token found');
+
+      final response = await _dio.put(
+        '/api/nginx/proxy-hosts/$hostId',
+        data: {
+          'enabled': enabled,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error toggling proxy host: $e');
+      return false;
     }
   }
 }

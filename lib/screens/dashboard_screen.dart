@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/proxy_host.dart';
 import '../services/api_service.dart';
 import 'login_screen.dart';
+
+const _toggleTimeout = Duration(seconds: 10);
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,6 +18,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService _apiService = ApiService();
   List<ProxyHost> _proxyHosts = [];
   bool _isLoading = true;
+  Set<int> _loadingHosts = {};
 
   @override
   void initState() {
@@ -52,6 +56,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
           builder: (context) => const LoginScreen(),
         ),
       );
+    }
+  }
+
+  Future<void> _toggleHost(ProxyHost host, int index, bool value) async {
+    // Show loading for this specific host
+    setState(() {
+      _loadingHosts.add(host.id);
+    });
+
+    try {
+      // Add timeout to the API call
+      final success = await _apiService
+          .toggleProxyHost(host.id, value)
+          .timeout(_toggleTimeout);
+
+      if (!mounted) return;
+
+      if (success) {
+        setState(() {
+          _proxyHosts[index] = ProxyHost(
+            id: host.id,
+            domainNames: host.domainNames,
+            forwardScheme: host.forwardScheme,
+            forwardHost: host.forwardHost,
+            forwardPort: host.forwardPort,
+            accessListId: host.accessListId,
+            certificateId: host.certificateId,
+            sslForced: host.sslForced,
+            enabled: value,
+          );
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(value
+                ? 'Proxy host enabled successfully'
+                : 'Proxy host disabled successfully'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update proxy host status'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e is TimeoutException
+              ? 'Request timed out. Please try again.'
+              : 'Error updating proxy host status'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } finally {
+      // Always remove loading state, even if there's an error
+      if (mounted) {
+        setState(() {
+          _loadingHosts.remove(host.id);
+        });
+      }
     }
   }
 
@@ -102,12 +173,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         subtitle: Text(
                           '${host.forwardScheme}://${host.forwardHost}:${host.forwardPort}',
                         ),
-                        trailing: Switch(
-                          value: host.enabled,
-                          onChanged: (value) {
-                            // TODO: Implement enable/disable functionality
-                          },
-                        ),
+                        trailing: _loadingHosts.contains(host.id)
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Switch(
+                                value: host.enabled,
+                                onChanged: (value) =>
+                                    _toggleHost(host, index, value),
+                              ),
                       ),
                     );
                   },
