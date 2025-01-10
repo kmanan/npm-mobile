@@ -17,7 +17,9 @@ Password: demopass123
 
 ## Screenshots
 
-![image](https://github.com/user-attachments/assets/952e3700-7c7b-4df7-a688-bb14810b6c5c) ![image](https://github.com/user-attachments/assets/68af0ad6-a168-4e8e-aead-3adde0f2da40)
+<img src="https://github.com/user-attachments/assets/881eb329-66e7-48ee-ba6c-99c9c6a28fc9" width="300" >
+
+<img src="https://github.com/user-attachments/assets/92f9988c-c497-4e11-a038-1dc64c7bb4f0" width="300" >
 
 ## About
 
