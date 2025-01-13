@@ -26,3 +26,12 @@ workflows:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY      # Keep this as is
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER    # Keep this as is
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID      # Keep this as is
+ios:
+  xcode: latest
+  provisioning_profile: YOUR_PP_NAME
+  certificates:
+    - distribution_certificate
+  build_settings:
+    ENABLE_BITCODE: NO
+  entitlements:
+    - com.apple.security.application-groups

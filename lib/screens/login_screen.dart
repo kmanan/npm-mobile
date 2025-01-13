@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/api_service.dart';
+import '../services/log_service.dart';
+import '../utils/share_logs.dart';
 import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,9 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
+  final _logService = LogService();
   bool _isLoading = false;
 
-  // Add focus nodes
   final _serverFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
@@ -38,6 +40,14 @@ class _LoginScreenState extends State<LoginScreen> {
         _serverController.text = savedServer;
       });
     }
+  }
+
+  Widget _buildShareLogsButton() {
+    return TextButton.icon(
+      onPressed: () => shareLogs(context),
+      icon: const Icon(Icons.share),
+      label: const Text('Share Authentication Logs'),
+    );
   }
 
   @override
@@ -165,6 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             : const Text('Login'),
                       ),
                     ),
+                    _buildShareLogsButton(),
                   ],
                 ),
               ),
@@ -228,9 +239,30 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else {
+        await _logService.logAuthFailure(
+          errorMessage: 'Authentication failed',
+          errorType: 'AUTH_ERROR',
+          statusCode: null,
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login failed. Please check your credentials.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      await _logService.logAuthFailure(
+        errorMessage: e.toString(),
+        errorType: 'UNKNOWN_ERROR',
+        statusCode: null,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An error occurred during login'),
             duration: Duration(seconds: 2),
           ),
         );
