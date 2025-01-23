@@ -15,7 +15,7 @@ Password: demopass123
 
 <a href="https://apps.apple.com/us/app/nginix-mobile-dashboard/id6740245899"><img src="https://github.com/user-attachments/assets/c9eaeb16-5333-43f8-a619-3384293be7d6" width="150"></a>
 
-[⬇️ Download Latest APK](https://github.com/kmanan/npm-mobile/releases/latest)
+[Google Play Store Test Build](https://docs.google.com/forms/d/11vgZdFv8GzAsqptp7Gh6UmeASBBRS7i01jAzZsoF9_0/) 
 
 ## Screenshots
 
