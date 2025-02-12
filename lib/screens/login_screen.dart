@@ -69,9 +69,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _tryBiometricAuth() async {
     try {
+      print('Starting biometric authentication attempt');
       final credentials = await _authService.getSavedCredentials();
+      print(
+          'Retrieved credentials - Server: ${credentials['serverUrl'] != null}, Email: ${credentials['email'] != null}, Password: ${credentials['password'] != null}');
 
       if (credentials['password'] == null) {
+        print('No saved password found');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -83,20 +87,26 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final enabled = await _authService.isBiometricEnabled();
+      print('Biometrics enabled check: $enabled');
+
       if (!enabled) {
+        print('Biometrics not enabled in preferences');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Face ID is not enabled. Please login with password and enable Face ID.'),
+                'Biometric authentication is not enabled. Please login with password and enable biometrics.'),
             duration: Duration(seconds: 2),
           ),
         );
         return;
       }
 
+      print('Attempting biometric authentication');
       final success = await _authService.authenticateWithBiometrics();
+      print('Biometric authentication result: $success');
 
       if (success && mounted) {
+        print('Authentication successful, setting credentials');
         setState(() {
           _serverController.text = credentials['serverUrl'] ?? '';
           _emailController.text = credentials['email'] ?? '';
@@ -104,15 +114,26 @@ class _LoginScreenState extends State<LoginScreen> {
           _rememberMe = true;
         });
         _handleLogin();
+      } else if (mounted) {
+        print('Authentication failed or widget not mounted');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Biometric authentication failed. Please try again or use password.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Error during Face ID authentication. Please try again.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      print('Error during biometric authentication: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error during biometric authentication: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 

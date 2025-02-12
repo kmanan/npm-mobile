@@ -43,6 +43,35 @@ Response: ${responseData ?? 'No response data'}
     }
   }
 
+  Future<void> logBiometricEvent({
+    required String event,
+    required String details,
+    Map<String, dynamic>? additionalInfo,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = DateTime.now().toIso8601String();
+
+      final logEntry = '''
+$timestamp
+Event: $event
+Details: $details
+${additionalInfo?.entries.map((e) => '${e.key}: ${e.value}').join('\n') ?? ''}
+----------------------------------------''';
+
+      final logs = prefs.getStringList(_logKey) ?? [];
+      logs.add(logEntry);
+
+      if (logs.length > 50) {
+        logs.removeAt(0);
+      }
+
+      await prefs.setStringList(_logKey, logs);
+    } catch (e) {
+      print('Error writing to log: $e');
+    }
+  }
+
   Future<List<String>> getLogs() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_logKey) ?? [];
