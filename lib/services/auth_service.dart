@@ -16,6 +16,7 @@ class AuthService {
   static const String _keyEncryptedPassword = 'encrypted_password';
   static const String _keyBiometricEnabled = 'biometric_enabled';
   static const String _keyEncryptionKey = 'encryption_key';
+  static const String _keyEncryptionIV = 'encryption_iv';
 
   // Check if biometric authentication is available
   Future<bool> isBiometricAvailable() async {
@@ -118,7 +119,7 @@ class AuthService {
       }
 
       final key = encrypt.Key.fromBase64(encryptionKey);
-      final iv = encrypt.IV.fromLength(16);
+      final iv = encrypt.IV.fromSecureRandom(16);
       final encrypter = encrypt.Encrypter(encrypt.AES(key));
       final encrypted = encrypter.encrypt(password, iv: iv);
 
@@ -126,6 +127,7 @@ class AuthService {
         _storage.write(key: _keyServerUrl, value: serverUrl),
         _storage.write(key: _keyEmail, value: email),
         _storage.write(key: _keyEncryptedPassword, value: encrypted.base64),
+        _storage.write(key: _keyEncryptionIV, value: iv.base64),
         _storage.write(
             key: _keyBiometricEnabled, value: enableBiometric.toString()),
       ]);
@@ -138,6 +140,7 @@ class AuthService {
           'server_saved': true,
           'email_saved': true,
           'password_saved': true,
+          'iv_saved': true,
         },
       );
     } catch (e) {
@@ -160,6 +163,7 @@ class AuthService {
 
       final encryptionKey = await _storage.read(key: _keyEncryptionKey);
       final encryptedPassword = await _storage.read(key: _keyEncryptedPassword);
+      final encryptionIV = await _storage.read(key: _keyEncryptionIV);
       final serverUrl = await _storage.read(key: _keyServerUrl);
       final email = await _storage.read(key: _keyEmail);
 
@@ -174,6 +178,13 @@ class AuthService {
         await _logService.logBiometricEvent(
           event: 'CREDENTIALS_ERROR',
           details: 'Encrypted password is missing',
+        );
+      }
+
+      if (encryptionIV == null) {
+        await _logService.logBiometricEvent(
+          event: 'CREDENTIALS_ERROR',
+          details: 'Encryption IV is missing',
         );
       }
 
@@ -197,16 +208,19 @@ class AuthService {
         additionalInfo: {
           'has_encryption_key': encryptionKey != null,
           'has_encrypted_password': encryptedPassword != null,
+          'has_encryption_iv': encryptionIV != null,
           'has_server_url': serverUrl != null,
           'has_email': email != null,
         },
       );
 
       String? decryptedPassword;
-      if (encryptionKey != null && encryptedPassword != null) {
+      if (encryptionKey != null &&
+          encryptedPassword != null &&
+          encryptionIV != null) {
         try {
           final key = encrypt.Key.fromBase64(encryptionKey);
-          final iv = encrypt.IV.fromLength(16);
+          final iv = encrypt.IV.fromBase64(encryptionIV);
           final encrypter = encrypt.Encrypter(encrypt.AES(key));
           decryptedPassword = encrypter.decrypt64(encryptedPassword, iv: iv);
 
@@ -258,6 +272,7 @@ class AuthService {
       _storage.delete(key: _keyEncryptedPassword),
       _storage.delete(key: _keyBiometricEnabled),
       _storage.delete(key: _keyEncryptionKey),
+      _storage.delete(key: _keyEncryptionIV),
     ]);
   }
 
@@ -272,6 +287,7 @@ class AuthService {
       _storage.delete(key: _keyEncryptedPassword),
       _storage.delete(key: _keyBiometricEnabled),
       _storage.delete(key: _keyEncryptionKey),
+      _storage.delete(key: _keyEncryptionIV),
     ]);
   }
 }
