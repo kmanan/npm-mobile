@@ -294,6 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.username],
                       enabled: !_isLoading,
                       textInputAction: TextInputAction.next,
                       onFieldSubmitted: (_) {
@@ -319,6 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       obscureText: true,
+                      autofillHints: const [AutofillHints.password],
                       enabled: !_isLoading,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) {
@@ -379,21 +381,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _clearServerUrl() async {
-    await _authService.clearCredentials();
-    if (mounted) {
-      setState(() {
-        _serverController.clear();
-        _emailController.clear();
-        _passwordController.clear();
-        _rememberMe = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('All saved credentials cleared'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    _serverController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Server URL cleared'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _pastePassword() async {

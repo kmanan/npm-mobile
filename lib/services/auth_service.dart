@@ -152,34 +152,94 @@ class AuthService {
 
   // Get saved credentials
   Future<Map<String, String?>> getSavedCredentials() async {
-    final encryptionKey = await _storage.read(key: _keyEncryptionKey);
-    String? decryptedPassword;
+    try {
+      await _logService.logBiometricEvent(
+        event: 'GET_CREDENTIALS_START',
+        details: 'Starting to retrieve saved credentials',
+      );
 
-    final encryptedPassword = await _storage.read(key: _keyEncryptedPassword);
-    if (encryptionKey != null && encryptedPassword != null) {
-      try {
-        final key = encrypt.Key.fromBase64(encryptionKey);
-        final iv = encrypt.IV.fromLength(16);
-        final encrypter = encrypt.Encrypter(encrypt.AES(key));
-        decryptedPassword = encrypter.decrypt64(encryptedPassword, iv: iv);
-      } catch (e) {
-        print('Error decrypting password: $e');
+      final encryptionKey = await _storage.read(key: _keyEncryptionKey);
+      final encryptedPassword = await _storage.read(key: _keyEncryptedPassword);
+      final serverUrl = await _storage.read(key: _keyServerUrl);
+      final email = await _storage.read(key: _keyEmail);
+
+      if (encryptionKey == null) {
+        await _logService.logBiometricEvent(
+          event: 'CREDENTIALS_ERROR',
+          details: 'Encryption key is missing',
+        );
       }
+
+      if (encryptedPassword == null) {
+        await _logService.logBiometricEvent(
+          event: 'CREDENTIALS_ERROR',
+          details: 'Encrypted password is missing',
+        );
+      }
+
+      if (serverUrl == null) {
+        await _logService.logBiometricEvent(
+          event: 'CREDENTIALS_ERROR',
+          details: 'Server URL is missing',
+        );
+      }
+
+      if (email == null) {
+        await _logService.logBiometricEvent(
+          event: 'CREDENTIALS_ERROR',
+          details: 'Email is missing',
+        );
+      }
+
+      await _logService.logBiometricEvent(
+        event: 'CREDENTIALS_CHECK',
+        details: 'Checking stored credentials',
+        additionalInfo: {
+          'has_encryption_key': encryptionKey != null,
+          'has_encrypted_password': encryptedPassword != null,
+          'has_server_url': serverUrl != null,
+          'has_email': email != null,
+        },
+      );
+
+      String? decryptedPassword;
+      if (encryptionKey != null && encryptedPassword != null) {
+        try {
+          final key = encrypt.Key.fromBase64(encryptionKey);
+          final iv = encrypt.IV.fromLength(16);
+          final encrypter = encrypt.Encrypter(encrypt.AES(key));
+          decryptedPassword = encrypter.decrypt64(encryptedPassword, iv: iv);
+
+          await _logService.logBiometricEvent(
+            event: 'PASSWORD_DECRYPTION',
+            details: 'Password decryption successful',
+          );
+        } catch (e) {
+          await _logService.logBiometricEvent(
+            event: 'DECRYPTION_ERROR',
+            details: 'Error decrypting password',
+            additionalInfo: {'error': e.toString()},
+          );
+        }
+      }
+
+      return {
+        'serverUrl': serverUrl,
+        'email': email,
+        'password': decryptedPassword,
+      };
+    } catch (e) {
+      await _logService.logBiometricEvent(
+        event: 'GET_CREDENTIALS_ERROR',
+        details: 'Error retrieving credentials',
+        additionalInfo: {'error': e.toString()},
+      );
+      return {
+        'serverUrl': null,
+        'email': null,
+        'password': null,
+      };
     }
-
-    final serverUrl = await _storage.read(key: _keyServerUrl);
-    final email = await _storage.read(key: _keyEmail);
-
-    print('Retrieved credentials - '
-        'Server URL exists: ${serverUrl != null}, '
-        'Email exists: ${email != null}, '
-        'Password exists: ${decryptedPassword != null}');
-
-    return {
-      'serverUrl': serverUrl,
-      'email': email,
-      'password': decryptedPassword,
-    };
   }
 
   // Check if biometric login is enabled

@@ -22,6 +22,7 @@ class LogService {
 
       final logEntry = '''
 $timestamp
+Type: AUTH_FAILURE
 Error Type: $errorType
 Message: $errorMessage
 Server URL: ${serverUrl ?? 'Unknown'}
@@ -54,6 +55,7 @@ Response: ${responseData ?? 'No response data'}
 
       final logEntry = '''
 $timestamp
+Type: BIOMETRIC_EVENT
 Event: $event
 Details: $details
 ${additionalInfo?.entries.map((e) => '${e.key}: ${e.value}').join('\n') ?? ''}
