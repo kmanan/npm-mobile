@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:io' show Platform;
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/log_service.dart';
@@ -161,7 +162,33 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                     ),
-                    const SizedBox(height: 40),
+                    if (_biometricsAvailable) ...[
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        icon: Platform.isIOS
+                            ? const Icon(Icons.face)
+                            : const Icon(Icons.fingerprint),
+                        label: Text(Platform.isIOS
+                            ? 'Sign in with Face ID'
+                            : 'Sign in with Biometrics'),
+                        onPressed: _tryBiometricAuth,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Or sign in with credentials',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
                     TextFormField(
                       controller: _serverController,
                       focusNode: _serverFocusNode,
@@ -251,14 +278,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                         ),
                         const Text('Remember Me'),
-                        if (_biometricsAvailable) ...[
-                          const Spacer(),
-                          IconButton(
-                            icon: const Icon(Icons.fingerprint),
-                            onPressed: _tryBiometricAuth,
-                            tooltip: 'Use biometric login',
-                          ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 24),

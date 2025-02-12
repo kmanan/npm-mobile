@@ -220,8 +220,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.language, size: 20),
-                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.language, size: 20),
+                                    onPressed: () =>
+                                        _launchUrl(_getDomainUrl(host)),
+                                    tooltip: _getDomainUrl(host),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
+                                  ),
                                   Expanded(
                                     child: Text(
                                       host.domainNames.first,
@@ -234,6 +243,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   IconButton(
                                     icon: const Icon(Icons.edit, size: 20),
                                     onPressed: () => _editProxyHost(host),
+                                    tooltip: 'Edit',
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
                                       minWidth: 40,
@@ -258,8 +268,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               Row(
                                 children: [
-                                  const Icon(Icons.link, size: 20),
-                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.link, size: 20),
+                                    onPressed: () =>
+                                        _launchUrl(_getDirectUrl(host)),
+                                    tooltip: _getDirectUrl(host),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
+                                  ),
                                   Expanded(
                                     child: Text(
                                       _getDirectUrl(host),
