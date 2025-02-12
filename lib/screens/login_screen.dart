@@ -39,30 +39,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _checkBiometrics() async {
     final available = await _authService.isBiometricAvailable();
-    final enabled = await _authService.isBiometricEnabled();
+    print('Biometrics available: $available');
 
-    if (available && enabled && mounted) {
+    if (available && mounted) {
       setState(() => _biometricsAvailable = true);
-      // Try biometric auth immediately if credentials are saved
-      _tryBiometricAuth();
+
+      // Check if we have saved credentials
+      final credentials = await _authService.getSavedCredentials();
+      final enabled = await _authService.isBiometricEnabled();
+
+      if (credentials['password'] != null && enabled && mounted) {
+        // Show biometric prompt immediately
+        _tryBiometricAuth();
+      }
     }
   }
 
   Future<void> _tryBiometricAuth() async {
-    final credentials = await _authService.getSavedCredentials();
-    if (credentials['password'] != null) {
+    try {
+      final credentials = await _authService.getSavedCredentials();
+      if (credentials['password'] == null) {
+        print('No saved credentials found');
+        return;
+      }
+
       final success = await _authService.authenticateWithBiometrics();
+      print('Biometric authentication result: $success');
+
       if (success && mounted) {
-        // Auto-fill the form
         setState(() {
           _serverController.text = credentials['serverUrl'] ?? '';
           _emailController.text = credentials['email'] ?? '';
           _passwordController.text = credentials['password'] ?? '';
           _rememberMe = true;
         });
-        // Attempt login
         _handleLogin();
       }
+    } catch (e) {
+      print('Error during biometric authentication: $e');
     }
   }
 

@@ -19,19 +19,31 @@ class AuthService {
   Future<bool> isBiometricAvailable() async {
     try {
       final isDeviceSupported = await _localAuth.isDeviceSupported();
-      if (!isDeviceSupported) return false;
+      if (!isDeviceSupported) {
+        print('Device does not support biometrics');
+        return false;
+      }
 
       final canCheckBiometrics = await _localAuth.canCheckBiometrics;
-      if (!canCheckBiometrics) return false;
+      if (!canCheckBiometrics) {
+        print('Cannot check biometrics');
+        return false;
+      }
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      print('Available biometrics: $availableBiometrics');
+
       if (Platform.isIOS) {
-        return availableBiometrics.contains(BiometricType.face) ||
+        final hasFaceId = availableBiometrics.contains(BiometricType.face);
+        final hasTouchId =
             availableBiometrics.contains(BiometricType.fingerprint);
-      } else {
-        return availableBiometrics.isNotEmpty;
+        print(
+            'iOS - Face ID available: $hasFaceId, Touch ID available: $hasTouchId');
+        return hasFaceId || hasTouchId;
       }
+      return availableBiometrics.isNotEmpty;
     } catch (e) {
+      print('Error checking biometric availability: $e');
       return false;
     }
   }
@@ -39,11 +51,17 @@ class AuthService {
   // Authenticate using biometrics
   Future<bool> authenticateWithBiometrics() async {
     try {
+      final isAvailable = await isBiometricAvailable();
+      if (!isAvailable) {
+        print('Biometrics not available');
+        return false;
+      }
+
       final localizedReason = Platform.isIOS
-          ? 'Use Face ID or Touch ID to access your Nginx dashboard'
+          ? 'Authenticate to access your Nginx dashboard'
           : 'Use biometrics to access your Nginx dashboard';
 
-      return await _localAuth.authenticate(
+      final authenticated = await _localAuth.authenticate(
         localizedReason: localizedReason,
         options: const AuthenticationOptions(
           stickyAuth: true,
@@ -51,6 +69,9 @@ class AuthService {
           useErrorDialogs: true,
         ),
       );
+
+      print('Authentication result: $authenticated');
+      return authenticated;
     } on PlatformException catch (e) {
       print('Biometric authentication error: ${e.message}');
       return false;
