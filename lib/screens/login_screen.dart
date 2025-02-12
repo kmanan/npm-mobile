@@ -414,8 +414,20 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         if (_rememberMe) {
           if (_biometricsAvailable) {
-            print('Showing biometric enable prompt after successful login');
-            await _showBiometricPrompt();
+            final biometricsEnabled = await _authService.isBiometricEnabled();
+            if (!biometricsEnabled) {
+              print('Showing biometric enable prompt after successful login');
+              await _showBiometricPrompt();
+            } else {
+              print(
+                  'Biometrics already enabled, saving credentials without prompt');
+              await _authService.saveCredentials(
+                serverUrl: _serverController.text.trim(),
+                email: _emailController.text.trim(),
+                password: _passwordController.text.trim(),
+                enableBiometric: true,
+              );
+            }
           } else {
             print('Saving credentials without biometrics');
             await _authService.saveCredentials(

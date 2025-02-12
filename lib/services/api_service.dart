@@ -64,6 +64,10 @@ class ApiService {
 
   Future<bool> login(String serverUrl, String email, String password) async {
     try {
+      // Update and save the server URL first
+      updateBaseUrl(serverUrl);
+      await saveServerUrl(serverUrl);
+
       // First try to reach the server with a shorter timeout
       try {
         await Future.any([
