@@ -40,32 +40,61 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _checkBiometrics() async {
     final available = await _authService.isBiometricAvailable();
-    print('Biometrics available: $available');
+    print('Initial biometrics check - Available: $available');
 
     if (available && mounted) {
+      final enabled = await _authService.isBiometricEnabled();
+      print('Biometrics enabled in preferences: $enabled');
+
+      final credentials = await _authService.getSavedCredentials();
+      print(
+          'Saved credentials check - Server: ${credentials['serverUrl'] != null}, '
+          'Email: ${credentials['email'] != null}, '
+          'Password: ${credentials['password'] != null}');
+
       setState(() => _biometricsAvailable = true);
 
-      // Check if we have saved credentials
-      final credentials = await _authService.getSavedCredentials();
-      final enabled = await _authService.isBiometricEnabled();
-
       if (credentials['password'] != null && enabled && mounted) {
-        // Show biometric prompt immediately
+        print('Attempting automatic biometric authentication');
         _tryBiometricAuth();
+      } else {
+        print('Not attempting automatic biometric auth - '
+            'Password exists: ${credentials['password'] != null}, '
+            'Biometrics enabled: $enabled');
       }
+    } else {
+      print('Biometrics not available or widget not mounted');
     }
   }
 
   Future<void> _tryBiometricAuth() async {
     try {
       final credentials = await _authService.getSavedCredentials();
+
       if (credentials['password'] == null) {
-        print('No saved credentials found');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'No saved credentials found. Please login with password first.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      final enabled = await _authService.isBiometricEnabled();
+      if (!enabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Face ID is not enabled. Please login with password and enable Face ID.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
         return;
       }
 
       final success = await _authService.authenticateWithBiometrics();
-      print('Biometric authentication result: $success');
 
       if (success && mounted) {
         setState(() {
@@ -77,7 +106,13 @@ class _LoginScreenState extends State<LoginScreen> {
         _handleLogin();
       }
     } catch (e) {
-      print('Error during biometric authentication: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Error during Face ID authentication. Please try again.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -96,9 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final shouldEnable = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Enable Biometric Login'),
+            title: const Text('Enable Face ID'),
             content: const Text(
-                'Would you like to enable biometric authentication for faster login next time?'),
+                'Would you like to enable Face ID for faster login next time?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -120,6 +155,15 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
         enableBiometric: true,
       );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Face ID enabled successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -357,8 +401,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         if (_rememberMe) {
           if (_biometricsAvailable) {
+            print('Showing biometric enable prompt after successful login');
             await _showBiometricPrompt();
           } else {
+            print('Saving credentials without biometrics');
             await _authService.saveCredentials(
               serverUrl: _serverController.text.trim(),
               email: _emailController.text.trim(),
@@ -366,6 +412,9 @@ class _LoginScreenState extends State<LoginScreen> {
               enableBiometric: false,
             );
           }
+        } else {
+          print('Remember me not checked, clearing any saved credentials');
+          await _authService.clearCredentials();
         }
 
         Navigator.of(context).pushReplacement(

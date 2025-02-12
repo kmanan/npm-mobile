@@ -18,32 +18,12 @@ class AuthService {
   // Check if biometric authentication is available
   Future<bool> isBiometricAvailable() async {
     try {
-      final isDeviceSupported = await _localAuth.isDeviceSupported();
-      if (!isDeviceSupported) {
-        print('Device does not support biometrics');
-        return false;
-      }
-
-      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
-      if (!canCheckBiometrics) {
-        print('Cannot check biometrics');
-        return false;
-      }
+      if (!await _localAuth.isDeviceSupported()) return false;
+      if (!await _localAuth.canCheckBiometrics) return false;
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
-      print('Available biometrics: $availableBiometrics');
-
-      if (Platform.isIOS) {
-        final hasFaceId = availableBiometrics.contains(BiometricType.face);
-        final hasTouchId =
-            availableBiometrics.contains(BiometricType.fingerprint);
-        print(
-            'iOS - Face ID available: $hasFaceId, Touch ID available: $hasTouchId');
-        return hasFaceId || hasTouchId;
-      }
-      return availableBiometrics.isNotEmpty;
+      return availableBiometrics.contains(BiometricType.fingerprint);
     } catch (e) {
-      print('Error checking biometric availability: $e');
       return false;
     }
   }
@@ -51,32 +31,18 @@ class AuthService {
   // Authenticate using biometrics
   Future<bool> authenticateWithBiometrics() async {
     try {
-      final isAvailable = await isBiometricAvailable();
-      if (!isAvailable) {
-        print('Biometrics not available');
-        return false;
-      }
+      if (!await isBiometricAvailable()) return false;
+      if (!await isBiometricEnabled()) return false;
 
-      final localizedReason = Platform.isIOS
-          ? 'Authenticate to access your Nginx dashboard'
-          : 'Use biometrics to access your Nginx dashboard';
-
-      final authenticated = await _localAuth.authenticate(
-        localizedReason: localizedReason,
+      return await _localAuth.authenticate(
+        localizedReason: 'Use fingerprint to sign in',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
           useErrorDialogs: true,
         ),
       );
-
-      print('Authentication result: $authenticated');
-      return authenticated;
-    } on PlatformException catch (e) {
-      print('Biometric authentication error: ${e.message}');
-      return false;
     } catch (e) {
-      print('Unexpected error during biometric authentication: $e');
       return false;
     }
   }
@@ -88,12 +54,12 @@ class AuthService {
     required String password,
     required bool enableBiometric,
   }) async {
-    // Generate a random encryption key if not exists
-    String encryptionKey = await _storage.read(key: _keyEncryptionKey) ??
-        encrypt.Key.fromSecureRandom(32).base64;
-
-    // Save the encryption key if it's new
-    await _storage.write(key: _keyEncryptionKey, value: encryptionKey);
+    // Only generate a new key if one doesn't exist
+    String? encryptionKey = await _storage.read(key: _keyEncryptionKey);
+    if (encryptionKey == null) {
+      encryptionKey = encrypt.Key.fromSecureRandom(32).base64;
+      await _storage.write(key: _keyEncryptionKey, value: encryptionKey);
+    }
 
     // Encrypt the password
     final key = encrypt.Key.fromBase64(encryptionKey);
@@ -109,6 +75,8 @@ class AuthService {
       _storage.write(
           key: _keyBiometricEnabled, value: enableBiometric.toString()),
     ]);
+
+    print('Credentials saved successfully');
   }
 
   // Get saved credentials
@@ -124,13 +92,21 @@ class AuthService {
         final encrypter = encrypt.Encrypter(encrypt.AES(key));
         decryptedPassword = encrypter.decrypt64(encryptedPassword, iv: iv);
       } catch (e) {
-        // If decryption fails, return null password
+        print('Error decrypting password: $e');
       }
     }
 
+    final serverUrl = await _storage.read(key: _keyServerUrl);
+    final email = await _storage.read(key: _keyEmail);
+
+    print('Retrieved credentials - '
+        'Server URL exists: ${serverUrl != null}, '
+        'Email exists: ${email != null}, '
+        'Password exists: ${decryptedPassword != null}');
+
     return {
-      'serverUrl': await _storage.read(key: _keyServerUrl),
-      'email': await _storage.read(key: _keyEmail),
+      'serverUrl': serverUrl,
+      'email': email,
       'password': decryptedPassword,
     };
   }
@@ -138,7 +114,9 @@ class AuthService {
   // Check if biometric login is enabled
   Future<bool> isBiometricEnabled() async {
     final enabled = await _storage.read(key: _keyBiometricEnabled);
-    return enabled?.toLowerCase() == 'true';
+    final isEnabled = enabled?.toLowerCase() == 'true';
+    print('Checking if biometrics enabled in preferences: $isEnabled');
+    return isEnabled;
   }
 
   // Clear all saved credentials
