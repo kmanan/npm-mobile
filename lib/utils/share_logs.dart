@@ -19,7 +19,7 @@ Future<void> shareLogs(BuildContext context) async {
   final emailBody = logs.join('\n');
   final Uri emailLaunchUri = Uri(
     scheme: 'mailto',
-    path: '',
+    path: 'manan@outlook.com',
     query: encodeQueryParameters({
       'subject': 'Nginx Mobile Dashboard Auth Logs',
       'body': emailBody,

@@ -1,0 +1,9 @@
+This app is a mobile app for a Nginx proxy manager.
+Before making any edit show me the current code and the changes you are suggesting.
+Only edit one file at a time.
+If you are not sure about the changes, ask me to confirm.
+The app has an android and an ios version.
+I am using flutter to develop the app.
+The iOS version is compiled using CodeMagic.
+Trust the codebase and not the documentation.
+

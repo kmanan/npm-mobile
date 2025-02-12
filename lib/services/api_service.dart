@@ -375,6 +375,55 @@ class ApiService {
     }
   }
 
+  Future<bool> updateProxyHost({
+    required int id,
+    required List<String> domainNames,
+    required String forwardScheme,
+    required String forwardHost,
+    required int forwardPort,
+    required bool sslForced,
+    bool? enabled,
+    int? certificateId,
+    int? accessListId,
+  }) async {
+    try {
+      if (isDemoMode) {
+        return true;
+      }
+
+      final token = await _storage.read(key: 'auth_token');
+      if (token == null) throw Exception('No auth token found');
+
+      final response = await _dio.put(
+        '/api/nginx/proxy-hosts/$id',
+        data: {
+          'domain_names': domainNames,
+          'forward_scheme': forwardScheme,
+          'forward_host': forwardHost,
+          'forward_port': forwardPort,
+          'ssl_forced': sslForced,
+          if (enabled != null) 'enabled': enabled,
+          if (certificateId != null) 'certificate_id': certificateId,
+          if (accessListId != null) 'access_list_id': accessListId,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => true,
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        print('Error updating proxy host: ${response.data}');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      print('Error updating proxy host: $e');
+      return false;
+    }
+  }
+
   // Add this new method to check server reachability
   Future<void> _checkServerReachable(String serverUrl) async {
     try {

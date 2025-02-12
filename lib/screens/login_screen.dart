@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/log_service.dart';
 import '../utils/share_logs.dart';
-import 'dashboard_screen.dart';
+import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,9 +20,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
-  final _storage = const FlutterSecureStorage();
+  final _authService = AuthService();
   final _logService = LogService();
   bool _isLoading = false;
+  bool _rememberMe = false;
+  bool _biometricsAvailable = false;
 
   final _serverFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
@@ -30,15 +33,78 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedServer();
+    _checkBiometrics();
+    _loadSavedCredentials();
   }
 
-  Future<void> _loadSavedServer() async {
-    final savedServer = await _storage.read(key: 'server_url');
-    if (savedServer != null && mounted) {
+  Future<void> _checkBiometrics() async {
+    final available = await _authService.isBiometricAvailable();
+    final enabled = await _authService.isBiometricEnabled();
+
+    if (available && enabled && mounted) {
+      setState(() => _biometricsAvailable = true);
+      // Try biometric auth immediately if credentials are saved
+      _tryBiometricAuth();
+    }
+  }
+
+  Future<void> _tryBiometricAuth() async {
+    final credentials = await _authService.getSavedCredentials();
+    if (credentials['password'] != null) {
+      final success = await _authService.authenticateWithBiometrics();
+      if (success && mounted) {
+        // Auto-fill the form
+        setState(() {
+          _serverController.text = credentials['serverUrl'] ?? '';
+          _emailController.text = credentials['email'] ?? '';
+          _passwordController.text = credentials['password'] ?? '';
+          _rememberMe = true;
+        });
+        // Attempt login
+        _handleLogin();
+      }
+    }
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final credentials = await _authService.getSavedCredentials();
+    if (mounted) {
       setState(() {
-        _serverController.text = savedServer;
+        _serverController.text = credentials['serverUrl'] ?? '';
+        _emailController.text = credentials['email'] ?? '';
+        // Don't set password here, only with biometric auth
       });
+    }
+  }
+
+  Future<void> _showBiometricPrompt() async {
+    final shouldEnable = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Enable Biometric Login'),
+            content: const Text(
+                'Would you like to enable biometric authentication for faster login next time?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('NO'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('YES'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (shouldEnable) {
+      await _authService.saveCredentials(
+        serverUrl: _serverController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        enableBiometric: true,
+      );
     }
   }
 
@@ -118,14 +184,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
+                      focusNode: _emailFocusNode,
                       decoration: const InputDecoration(
                         labelText: 'Email',
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.emailAddress,
                       enabled: !_isLoading,
-                      showCursor: true, // Add this line
-                      readOnly: false, // Add this line
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordFocusNode);
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
@@ -157,6 +226,26 @@ class _LoginScreenState extends State<LoginScreen> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _rememberMe,
+                          onChanged: (value) {
+                            setState(() => _rememberMe = value ?? false);
+                          },
+                        ),
+                        const Text('Remember Me'),
+                        if (_biometricsAvailable) ...[
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.fingerprint),
+                            onPressed: _tryBiometricAuth,
+                            tooltip: 'Use biometric login',
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -194,14 +283,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _clearServerUrl() async {
-    await _storage.delete(key: 'server_url');
+    await _authService.clearCredentials();
     if (mounted) {
       setState(() {
         _serverController.clear();
+        _emailController.clear();
+        _passwordController.clear();
+        _rememberMe = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Server URL cleared'),
+          content: Text('All saved credentials cleared'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -230,12 +322,22 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (success) {
-        await _storage.write(
-            key: 'server_url', value: _serverController.text.trim());
+        if (_rememberMe) {
+          if (_biometricsAvailable) {
+            await _showBiometricPrompt();
+          } else {
+            await _authService.saveCredentials(
+              serverUrl: _serverController.text.trim(),
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+              enableBiometric: false,
+            );
+          }
+        }
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const DashboardScreen(),
+            builder: (context) => const MainScreen(),
           ),
         );
       } else {
