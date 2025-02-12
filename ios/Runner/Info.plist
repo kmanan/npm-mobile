@@ -51,5 +51,11 @@
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID or Touch ID to securely access your Nginx dashboard</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app does not require microphone access</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app does not require photo library access</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app does not require camera access</string>
 </dict>
 </plist>

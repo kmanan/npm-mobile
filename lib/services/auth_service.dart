@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'dart:io' show Platform;
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
@@ -17,8 +18,19 @@ class AuthService {
   // Check if biometric authentication is available
   Future<bool> isBiometricAvailable() async {
     try {
-      return await _localAuth.canCheckBiometrics &&
-          await _localAuth.isDeviceSupported();
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      if (!isDeviceSupported) return false;
+
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      if (!canCheckBiometrics) return false;
+
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      if (Platform.isIOS) {
+        return availableBiometrics.contains(BiometricType.face) ||
+            availableBiometrics.contains(BiometricType.fingerprint);
+      } else {
+        return availableBiometrics.isNotEmpty;
+      }
     } catch (e) {
       return false;
     }
@@ -27,14 +39,23 @@ class AuthService {
   // Authenticate using biometrics
   Future<bool> authenticateWithBiometrics() async {
     try {
+      final localizedReason = Platform.isIOS
+          ? 'Use Face ID or Touch ID to access your Nginx dashboard'
+          : 'Use biometrics to access your Nginx dashboard';
+
       return await _localAuth.authenticate(
-        localizedReason: 'Use biometrics to access your Nginx dashboard',
+        localizedReason: localizedReason,
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
+          useErrorDialogs: true,
         ),
       );
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      print('Biometric authentication error: ${e.message}');
+      return false;
+    } catch (e) {
+      print('Unexpected error during biometric authentication: $e');
       return false;
     }
   }
