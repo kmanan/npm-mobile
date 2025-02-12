@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/proxy_host.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'proxy_host_edit_screen.dart';
 
@@ -18,6 +19,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService();
   List<ProxyHost> _proxyHosts = [];
   bool _isLoading = true;
   Set<int> _loadingHosts = {};
@@ -48,9 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _handleLogout() async {
-    const storage = FlutterSecureStorage();
-    await storage.delete(key: 'auth_token');
-    // Note: We don't delete 'server_url' so it persists for next login
+    await _authService.handleLogout();
 
     if (mounted) {
       Navigator.of(context).pushReplacement(

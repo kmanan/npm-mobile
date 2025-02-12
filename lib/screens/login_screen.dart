@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
   final _logService = LogService();
   bool _isLoading = false;
-  bool _rememberMe = false;
+  bool _rememberMe = true;
   bool _biometricsAvailable = false;
 
   final _serverFocusNode = FocusNode();
@@ -152,9 +152,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final shouldEnable = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Enable Face ID'),
+            title: const Text('Enable Biometric Login'),
             content: const Text(
-                'Would you like to enable Face ID for faster login next time?'),
+                'Would you like to enable biometric login for faster access next time?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Face ID enabled successfully'),
+            content: Text('Biometric login enabled successfully'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -233,9 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         icon: Platform.isIOS
                             ? const Icon(Icons.face)
                             : const Icon(Icons.fingerprint),
-                        label: Text(Platform.isIOS
-                            ? 'Sign in with Face ID'
-                            : 'Sign in with Biometrics'),
+                        label: const Text('Sign in with Biometrics'),
                         onPressed: _tryBiometricAuth,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
@@ -244,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
                       const Text(
                         'Or sign in with credentials',
                         style: TextStyle(

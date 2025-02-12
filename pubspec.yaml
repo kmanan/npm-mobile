@@ -2,7 +2,7 @@ name: npm_phone_app
 description: "Nginx Mobile Dashboard - A mobile client for Nginx Proxy Manager"
 publish_to: 'none'
 
-version: 1.0.3+5
+version: 1.0.3+6
 
 environment:
   sdk: '>=3.2.3 <4.0.0'

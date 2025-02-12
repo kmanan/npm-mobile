@@ -201,6 +201,11 @@ class AuthService {
     ]);
   }
 
+  // Handle logout - only clear auth token
+  Future<void> handleLogout() async {
+    await _storage.delete(key: 'auth_token');
+  }
+
   // Clear only the saved password but keep server and email
   Future<void> clearPassword() async {
     await Future.wait([
