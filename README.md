@@ -32,21 +32,20 @@ Fully built using Cursor.AI
 ## Features
 
 - Connect to your Nginx Proxy Manager instance
-- Secure authentication
-- View all proxy hosts
+- Secure authentication (plus device native biometrics support_
+- Manage all proxy hosts (view and edit)
+- Each proxy host IP or URL is clickable
 - Monitor proxy host status
-- Save server URL for quick access
+- Porst List screen that sequentially lists all ports categorized for each server
+- Custom naming for each server
+- Search for ports on the Ports List page
 - Mobile-optimized interface
-
-## Installation
-
-Download the latest APK from the releases section and install it on your Android device.
 
 ### Requirements
 
-- Android 5.0 or higher
+- Latest iOS or Android device
 - Active Nginx Proxy Manager instance
-- Network access to your NPM server
+- Local network access to your NPM server
 
 ## Usage
 
@@ -55,29 +54,11 @@ Download the latest APK from the releases section and install it on your Android
 3. Log in with your NPM credentials
 4. View and monitor your proxy hosts
 
-## Building from Source
-
-1. Clone the repository
-   ```bash
-   git clone https://github.com/kmanan/npm-mobile.git
-   ```
-
-2. Install dependencies
-   ```bash
-   flutter pub get
-   ```
-
-3. Build the release APK
-   ```bash
-   flutter build apk --release
-   ```
-
 ## Credits
 
 - [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager) - The awesome project this app is built for
 - Built with [Flutter](https://flutter.dev)
 - Cursor.AI (https://cursor.ai)
-- VS Code
 
 ## License
 
