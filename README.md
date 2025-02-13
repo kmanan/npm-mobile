@@ -32,8 +32,8 @@ Fully built using Cursor.AI
 ## Features
 
 - Connect to your Nginx Proxy Manager instance
-- Secure authentication (plus device native biometrics support_
-- Manage all proxy hosts (view and edit)
+- Secure authentication (plus device native biometrics support)
+- Manage all proxy hosts (view, edit, turn on-off)
 - Each proxy host IP or URL is clickable
 - Monitor proxy host status
 - Porst List screen that sequentially lists all ports categorized for each server
