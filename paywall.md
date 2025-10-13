@@ -11,9 +11,9 @@
 
 Implement a subscription-based paywall to monetize premium features:
 - **Free Tier:** Single NPM instance, view/edit existing hosts
-- **Premium Tier ($1/month or $10/year):** Multiple NPM instances + create new hosts
+- **Premium Tier ($0.99/month or $9.99/year with 7-day free trial):** Multiple NPM instances + create new hosts
 
-This document covers full compliance with Apple App Store and Google Play Store requirements, implementation using Flutter's `in_app_purchase` package, and user experience considerations.
+This document covers full compliance with Apple App Store and Google Play Store requirements, implementation using Flutter's `in_app_purchase` package, user experience considerations, and 7-day free trial implementation.
 
 ---
 
@@ -131,13 +131,22 @@ This document covers full compliance with Apple App Store and Google Play Store 
 
 ### Premium Tier
 
+**7-Day Free Trial**
+- ✅ Full premium access for 7 days
+- ✅ No charge during trial period
+- ✅ Cancel anytime at no cost
+- ✅ One-time offer for new users
+- ⚡ Instant activation (no payment info required during trial setup)
+
 **Monthly: $0.99 USD/month**
-- Billed monthly
+- 7-day free trial for new users
+- Billed monthly after trial
 - Cancel anytime
 - Auto-renews until canceled
 
 **Yearly: $9.99 USD/year**
-- Billed annually
+- 7-day free trial for new users
+- Billed annually after trial
 - Cancel anytime
 - Auto-renews until canceled
 - Save $1.89/year (16% discount)
@@ -149,6 +158,7 @@ This document covers full compliance with Apple App Store and Google Play Store 
 - 🎁 Future premium features at no extra cost
 
 **Pricing Strategy:**
+- 7-day free trial removes friction and increases conversion
 - Low barrier to entry ($0.99/month)
 - Yearly option encourages long-term subscriptions
 - Competitive with similar utility apps
@@ -899,10 +909,11 @@ Future<void> _showAddInstanceDialog() async {
 4. Product ID: `npm_premium_monthly`
 5. Subscription Duration: 1 Month
 6. Price: $0.99 USD (Tier 1)
-7. Localized Information:
+7. **Free Trial: 7 Days** ⭐
+8. Localized Information:
    - Display Name: "Premium Monthly"
-   - Description: "Unlock multiple NPM instances and create unlimited proxy hosts"
-8. Review Information:
+   - Description: "Unlock multiple NPM instances and create unlimited proxy hosts. 7-day free trial included."
+9. Review Information:
    - Screenshot of paywall screen
    - Subscription benefits description
 
@@ -913,10 +924,11 @@ Future<void> _showAddInstanceDialog() async {
 4. Product ID: `npm_premium_yearly`
 5. Subscription Duration: 1 Year
 6. Price: $9.99 USD (Tier 10)
-7. Localized Information:
+7. **Free Trial: 7 Days** ⭐
+8. Localized Information:
    - Display Name: "Premium Yearly"
-   - Description: "Unlock multiple NPM instances and create unlimited proxy hosts. Save 16% compared to monthly."
-8. Review Information:
+   - Description: "Unlock multiple NPM instances and create unlimited proxy hosts. Save 16% compared to monthly. 7-day free trial included."
+9. Review Information:
    - Screenshot of paywall screen
    - Subscription benefits description
 
@@ -945,22 +957,22 @@ Future<void> _showAddInstanceDialog() async {
 2. Click "Create subscription"
 3. Product ID: `npm_premium_monthly`
 4. Name: "Premium Monthly"
-5. Description: "Unlock multiple NPM instances and create unlimited proxy hosts"
+5. Description: "Unlock multiple NPM instances and create unlimited proxy hosts. 7-day free trial included."
 6. Billing period: 1 Month
 7. Price: $0.99 USD
 8. Grace period: 3 days (default)
-9. Free trial: None (optional: 7 days)
+9. **Free trial: 7 days** ⭐
 10. Base plans: Create "Monthly" plan
 
 **Step 3: Create Yearly Subscription**
 1. Click "Create subscription"
 2. Product ID: `npm_premium_yearly`
 3. Name: "Premium Yearly"
-4. Description: "Unlock multiple NPM instances and create unlimited proxy hosts. Save 16% compared to monthly."
+4. Description: "Unlock multiple NPM instances and create unlimited proxy hosts. Save 16% compared to monthly. 7-day free trial included."
 5. Billing period: 1 Year
 6. Price: $9.99 USD
 7. Grace period: 3 days
-8. Free trial: None (optional: 7 days)
+8. **Free trial: 7 days** ⭐
 9. Base plans: Create "Yearly" plan
 
 **Step 4: Configure Settings**

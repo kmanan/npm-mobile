@@ -4,9 +4,11 @@ import 'dart:io' show Platform;
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/log_service.dart';
+import '../services/subscription_service.dart';
 import '../utils/share_logs.dart';
 import '../models/npm_instance.dart';
 import 'main_screen.dart';
+import 'paywall_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -244,6 +246,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showAddInstanceDialog() async {
+    final subscriptionService = SubscriptionService();
+    final instanceCount = _instances.length;
+
+    // Check if user can add more instances
+    final canAdd = await subscriptionService.canAddInstance(instanceCount);
+
+    if (!canAdd) {
+      // Show paywall
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PaywallScreen(feature: 'multi_instance'),
+        ),
+      );
+
+      if (result != true) {
+        return; // User didn't subscribe or start trial
+      }
+    }
+
     final nameController = TextEditingController();
     final serverController = TextEditingController();
     final emailController = TextEditingController();

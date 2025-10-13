@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'services/subscription_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize subscription service
+  final subscriptionService = SubscriptionService();
+  await subscriptionService.initialize();
+
   runApp(const NginxProxyManagerApp());
 }
 

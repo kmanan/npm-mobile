@@ -5,9 +5,11 @@ import '../models/proxy_host.dart';
 import '../models/npm_instance.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/subscription_service.dart';
 import 'login_screen.dart';
 import 'proxy_host_edit_screen.dart';
 import 'proxy_host_add_screen.dart';
+import 'paywall_screen.dart';
 
 const _toggleTimeout = Duration(seconds: 10);
 
@@ -268,6 +270,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _addProxyHost() async {
+    final subscriptionService = SubscriptionService();
+
+    // Check if user can create hosts
+    final canCreate = await subscriptionService.canCreateHost();
+
+    if (!canCreate) {
+      // Show paywall
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PaywallScreen(feature: 'create_host'),
+        ),
+      );
+
+      if (result != true) {
+        return; // User didn't subscribe or start trial
+      }
+    }
+
+    // Proceed with creating host
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
