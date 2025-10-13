@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'proxy_host_edit_screen.dart';
+import 'proxy_host_add_screen.dart';
 
 const _toggleTimeout = Duration(seconds: 10);
 
@@ -266,6 +267,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _addProxyHost() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProxyHostAddScreen(),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh the list if a host was added
+      setState(() => _isLoading = true);
+      _loadProxyHosts();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -421,6 +437,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   },
                 ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addProxyHost,
+        backgroundColor: Colors.blue,
+        tooltip: 'Add Proxy Host',
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

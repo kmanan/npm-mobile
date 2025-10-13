@@ -563,6 +563,90 @@ class ApiService {
     }
   }
 
+  /// Create a new proxy host
+  Future<ProxyHost?> createProxyHost({
+    required List<String> domainNames,
+    required String forwardScheme,
+    required String forwardHost,
+    required int forwardPort,
+    required bool sslForced,
+    bool? enabled,
+    int? certificateId,
+    int? accessListId,
+    bool blockExploits = true,
+    bool cachingEnabled = false,
+    bool allowWebsocketUpgrade = false,
+    bool http2Support = false,
+    String advancedConfig = '',
+  }) async {
+    try {
+      if (isDemoMode) {
+        // In demo mode, return a fake host with a random ID
+        return ProxyHost(
+          id: DateTime.now().millisecondsSinceEpoch,
+          domainNames: domainNames,
+          forwardScheme: forwardScheme,
+          forwardHost: forwardHost,
+          forwardPort: forwardPort,
+          accessListId: accessListId,
+          certificateId: certificateId,
+          sslForced: sslForced,
+          enabled: enabled ?? true,
+        );
+      }
+
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      String? token;
+      if (activeInstanceId != null) {
+        token = await getInstanceAuthToken(activeInstanceId);
+      } else {
+        token = await _storage.read(key: 'auth_token');
+      }
+      if (token == null) throw Exception('No auth token found');
+
+      final response = await _dio.post(
+        '/api/nginx/proxy-hosts',
+        data: {
+          'domain_names': domainNames,
+          'forward_scheme': forwardScheme,
+          'forward_host': forwardHost,
+          'forward_port': forwardPort,
+          'ssl_forced': sslForced,
+          'enabled': enabled ?? true,
+          'access_list_id': accessListId ?? 0,
+          'certificate_id': certificateId ?? 0,
+          'block_exploits': blockExploits,
+          'caching_enabled': cachingEnabled,
+          'allow_websocket_upgrade': allowWebsocketUpgrade,
+          'http2_support': http2Support,
+          'advanced_config': advancedConfig,
+          'hsts_enabled': false,
+          'hsts_subdomains': false,
+          'meta': {
+            'letsencrypt_agree': false,
+            'dns_challenge': false,
+            'letsencrypt_email': '',
+          },
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => true,
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Parse the response and return the created ProxyHost
+        return ProxyHost.fromJson(response.data);
+      } else {
+        print('Error creating proxy host: ${response.data}');
+        return null;
+      }
+    } catch (e) {
+      print('Error creating proxy host: $e');
+      return null;
+    }
+  }
+
   // Add this new method to check server reachability
   Future<void> _checkServerReachable(String serverUrl) async {
     try {
