@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlin_version = '1.7.10'
+    ext.kotlin_version = '1.9.22'
 }
 
 plugins {
@@ -17,7 +17,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace "com.manan.npm_phone_app"
     compileSdkVersion flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
