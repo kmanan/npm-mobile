@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/proxy_host.dart';
+import '../models/npm_instance.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
@@ -23,11 +23,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<ProxyHost> _proxyHosts = [];
   bool _isLoading = true;
   Set<int> _loadingHosts = {};
+  NpmInstance? _activeInstance;
 
   @override
   void initState() {
     super.initState();
+    _loadActiveInstance();
     _loadProxyHosts();
+  }
+
+  Future<void> _loadActiveInstance() async {
+    final instance = await _authService.getActiveInstance();
+    if (mounted) {
+      setState(() {
+        _activeInstance = instance;
+      });
+    }
   }
 
   Future<void> _loadProxyHosts() async {
@@ -50,7 +61,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _handleLogout() async {
-    await _authService.handleLogout();
+    // Clear auth token for active instance
+    final activeId = await _authService.getActiveInstanceId();
+    if (activeId != null) {
+      await _apiService.clearInstanceAuthToken(activeId);
+    } else {
+      await _authService.handleLogout();
+    }
 
     if (mounted) {
       Navigator.of(context).pushReplacement(
@@ -58,6 +75,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
           builder: (context) => const LoginScreen(),
         ),
       );
+    }
+  }
+
+  Future<void> _showInstanceSwitcher() async {
+    final instances = await _authService.getAllInstances();
+    final activeId = await _authService.getActiveInstanceId();
+
+    if (!mounted) return;
+
+    final selectedInstance = await showDialog<NpmInstance>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Switch NPM Instance'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: instances.length,
+            itemBuilder: (context, index) {
+              final instance = instances[index];
+              final isActive = instance.id == activeId;
+              return ListTile(
+                leading: Icon(
+                  isActive
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: isActive ? Colors.blue : null,
+                ),
+                title: Text(instance.name),
+                subtitle: Text(instance.serverUrl),
+                trailing: instance.biometricEnabled
+                    ? const Icon(Icons.fingerprint, size: 16)
+                    : null,
+                onTap: isActive ? null : () => Navigator.pop(context, instance),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedInstance != null && mounted) {
+      // Confirm switch
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Switch Instance'),
+          content: Text(
+              'Switch to "${selectedInstance.name}"?\n\nYou will need to log in again.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('SWITCH'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true && mounted) {
+        // Clear current session and switch
+        await _handleLogout();
+        await _authService.setActiveInstance(selectedInstance.id);
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const LoginScreen(),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -175,18 +272,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/icon/icon.png',
-              width: 30, // Smaller size for AppBar
-              height: 30,
-            ),
-            const SizedBox(width: 8), // Space between icon and text
-            const Text('Nginx Mobile Dashboard'),
-          ],
+        title: GestureDetector(
+          onTap: _showInstanceSwitcher,
+          child: Row(
+            children: [
+              Image.asset(
+                'assets/icon/icon.png',
+                width: 30,
+                height: 30,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Nginx Mobile Dashboard',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    if (_activeInstance != null)
+                      Text(
+                        _activeInstance!.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.swap_horiz),
+            onPressed: _showInstanceSwitcher,
+            tooltip: 'Switch Instance',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {

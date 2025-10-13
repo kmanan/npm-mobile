@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:io' show Platform;
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/log_service.dart';
 import '../utils/share_logs.dart';
+import '../models/npm_instance.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,6 +26,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _rememberMe = true;
   bool _biometricsAvailable = false;
+  List<NpmInstance> _instances = [];
+  String? _selectedInstanceId;
 
   final _serverFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
@@ -34,19 +36,74 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkBiometrics();
-    _loadSavedCredentials();
+    _checkStorageHealth();
+    _checkMigration();
+    _loadInstances();
+  }
+
+  Future<void> _checkStorageHealth() async {
+    final isHealthy = await _authService.checkStorageHealth();
+    if (!isHealthy) {
+      print('WARNING: Secure storage is not working properly on this device');
+    }
+  }
+
+  Future<void> _checkMigration() async {
+    final needsMigration = await _authService.needsMigration();
+    if (needsMigration) {
+      await _authService.migrateFromLegacyStorage();
+    }
+  }
+
+  Future<void> _loadInstances() async {
+    final instances = await _authService.getAllInstances();
+    if (mounted) {
+      setState(() {
+        _instances = instances;
+        if (_instances.isNotEmpty) {
+          // Select the most recently used instance (first in list)
+          _selectedInstanceId = _instances.first.id;
+          _loadInstanceCredentials(_instances.first);
+        }
+      });
+      if (_instances.isNotEmpty) {
+        _checkBiometrics();
+      }
+    }
+  }
+
+  Future<void> _loadInstanceCredentials(NpmInstance instance) async {
+    final credentials = await _authService.getInstanceCredentials(instance.id);
+    if (mounted) {
+      setState(() {
+        _serverController.text = credentials['serverUrl'] ?? '';
+        _emailController.text = credentials['email'] ?? '';
+        // Don't set password here, only with biometric auth
+      });
+    }
+  }
+
+  Future<void> _selectInstance(String instanceId) async {
+    final instance = _instances.firstWhere((inst) => inst.id == instanceId);
+    setState(() {
+      _selectedInstanceId = instanceId;
+    });
+    await _authService.setActiveInstance(instanceId);
+    await _loadInstanceCredentials(instance);
+    await _checkBiometrics();
   }
 
   Future<void> _checkBiometrics() async {
     final available = await _authService.isBiometricAvailable();
     print('Initial biometrics check - Available: $available');
 
-    if (available && mounted) {
-      final enabled = await _authService.isBiometricEnabled();
-      print('Biometrics enabled in preferences: $enabled');
+    if (available && mounted && _selectedInstanceId != null) {
+      final enabled =
+          await _authService.isInstanceBiometricEnabled(_selectedInstanceId!);
+      print('Biometrics enabled for instance: $enabled');
 
-      final credentials = await _authService.getSavedCredentials();
+      final credentials =
+          await _authService.getInstanceCredentials(_selectedInstanceId!);
       print(
           'Saved credentials check - Server: ${credentials['serverUrl'] != null}, '
           'Email: ${credentials['email'] != null}, '
@@ -63,14 +120,21 @@ class _LoginScreenState extends State<LoginScreen> {
             'Biometrics enabled: $enabled');
       }
     } else {
-      print('Biometrics not available or widget not mounted');
+      print(
+          'Biometrics not available or widget not mounted or no instance selected');
     }
   }
 
   Future<void> _tryBiometricAuth() async {
     try {
+      if (_selectedInstanceId == null) {
+        print('No instance selected');
+        return;
+      }
+
       print('Starting biometric authentication attempt');
-      final credentials = await _authService.getSavedCredentials();
+      final credentials =
+          await _authService.getInstanceCredentials(_selectedInstanceId!);
       print(
           'Retrieved credentials - Server: ${credentials['serverUrl'] != null}, Email: ${credentials['email'] != null}, Password: ${credentials['password'] != null}');
 
@@ -86,7 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final enabled = await _authService.isBiometricEnabled();
+      final enabled =
+          await _authService.isInstanceBiometricEnabled(_selectedInstanceId!);
       print('Biometrics enabled check: $enabled');
 
       if (!enabled) {
@@ -137,18 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _loadSavedCredentials() async {
-    final credentials = await _authService.getSavedCredentials();
-    if (mounted) {
-      setState(() {
-        _serverController.text = credentials['serverUrl'] ?? '';
-        _emailController.text = credentials['email'] ?? '';
-        // Don't set password here, only with biometric auth
-      });
-    }
-  }
-
   Future<void> _showBiometricPrompt() async {
+    if (_selectedInstanceId == null) return;
+
     final shouldEnable = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -170,9 +226,8 @@ class _LoginScreenState extends State<LoginScreen> {
         false;
 
     if (shouldEnable) {
-      await _authService.saveCredentials(
-        serverUrl: _serverController.text.trim(),
-        email: _emailController.text.trim(),
+      await _authService.updateInstance(
+        instanceId: _selectedInstanceId!,
         password: _passwordController.text.trim(),
         enableBiometric: true,
       );
@@ -184,6 +239,203 @@ class _LoginScreenState extends State<LoginScreen> {
             duration: Duration(seconds: 2),
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _showAddInstanceDialog() async {
+    final nameController = TextEditingController();
+    final serverController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool enableBiometric = false;
+    final biometricAvailable = await _authService.isBiometricAvailable();
+
+    if (!mounted) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Add NPM Instance'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Instance Name',
+                    hintText: 'Production Server',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: serverController,
+                  decoration: const InputDecoration(
+                    labelText: 'Server URL',
+                    hintText: 'example.com or 192.168.1.1',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 16),
+                if (biometricAvailable)
+                  CheckboxListTile(
+                    title: const Text('Enable Biometric Login'),
+                    value: enableBiometric,
+                    onChanged: (value) {
+                      setState(() {
+                        enableBiometric = value ?? false;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (nameController.text.trim().isEmpty ||
+                    serverController.text.trim().isEmpty ||
+                    emailController.text.trim().isEmpty ||
+                    passwordController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in all fields'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  // First test login
+                  final loginSuccess = await _apiService.login(
+                    serverController.text.trim(),
+                    emailController.text.trim(),
+                    passwordController.text.trim(),
+                  );
+
+                  if (!loginSuccess) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Could not connect to server. Please verify credentials.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  // Create instance
+                  final instanceId = await _authService.createInstance(
+                    name: nameController.text.trim(),
+                    serverUrl: serverController.text.trim(),
+                    email: emailController.text.trim(),
+                    password: passwordController.text.trim(),
+                    enableBiometric: enableBiometric,
+                  );
+
+                  // Set as active instance
+                  await _authService.setActiveInstance(instanceId);
+
+                  if (context.mounted) {
+                    Navigator.pop(context, true);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('ADD'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true) {
+      await _loadInstances();
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const MainScreen(),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showDeleteInstanceDialog(NpmInstance instance) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Instance'),
+        content: Text(
+            'Are you sure you want to delete "${instance.name}"?\n\nThis will remove all saved credentials for this instance.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('DELETE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _authService.deleteInstance(instance.id);
+        await _loadInstances();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Instance deleted successfully'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting instance: $e'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     }
   }
@@ -252,6 +504,95 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                     const SizedBox(height: 24),
+                    // Instance selector
+                    if (_instances.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'NPM Instance',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                            ),
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Add New'),
+                            onPressed: _showAddInstanceDialog,
+                          ),
+                        ],
+                      ),
+                      DropdownButtonFormField<String>(
+                        value: _selectedInstanceId,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        dropdownColor: Colors.grey[900],
+                        items: _instances.map((instance) {
+                          return DropdownMenuItem(
+                            value: instance.id,
+                            child: Text(
+                              '${instance.biometricEnabled ? "🔒 " : ""}${instance.name}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (instanceId) {
+                          if (instanceId != null) {
+                            _selectInstance(instanceId);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_instances.length} instance${_instances.length != 1 ? 's' : ''} configured',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 11,
+                            ),
+                          ),
+                          if (_selectedInstanceId != null)
+                            TextButton.icon(
+                              icon: const Icon(Icons.delete, size: 16),
+                              label: const Text('Delete',
+                                  style: TextStyle(fontSize: 11)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              onPressed: () {
+                                final instance = _instances.firstWhere(
+                                  (inst) => inst.id == _selectedInstanceId,
+                                );
+                                _showDeleteInstanceDialog(instance);
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      Text(
+                        'No instances configured',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add First Instance'),
+                        onPressed: _showAddInstanceDialog,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     TextFormField(
                       controller: _serverController,
                       focusNode: _serverFocusNode,
@@ -403,6 +744,21 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // If no instance exists, create one first
+      if (_selectedInstanceId == null) {
+        final instanceId = await _authService.createInstance(
+          name: _serverController.text.trim(),
+          serverUrl: _serverController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+          enableBiometric: false,
+        );
+        await _authService.setActiveInstance(instanceId);
+        setState(() {
+          _selectedInstanceId = instanceId;
+        });
+      }
+
       final success = await _apiService.login(
         _serverController.text.trim(),
         _emailController.text.trim(),
@@ -412,34 +768,30 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (success) {
-        if (_rememberMe) {
+        if (_rememberMe && _selectedInstanceId != null) {
           if (_biometricsAvailable) {
-            final biometricsEnabled = await _authService.isBiometricEnabled();
+            final biometricsEnabled = await _authService
+                .isInstanceBiometricEnabled(_selectedInstanceId!);
             if (!biometricsEnabled) {
               print('Showing biometric enable prompt after successful login');
               await _showBiometricPrompt();
             } else {
               print(
-                  'Biometrics already enabled, saving credentials without prompt');
-              await _authService.saveCredentials(
-                serverUrl: _serverController.text.trim(),
-                email: _emailController.text.trim(),
+                  'Biometrics already enabled, updating instance without prompt');
+              await _authService.updateInstance(
+                instanceId: _selectedInstanceId!,
                 password: _passwordController.text.trim(),
                 enableBiometric: true,
               );
             }
           } else {
-            print('Saving credentials without biometrics');
-            await _authService.saveCredentials(
-              serverUrl: _serverController.text.trim(),
-              email: _emailController.text.trim(),
+            print('Updating instance credentials without biometrics');
+            await _authService.updateInstance(
+              instanceId: _selectedInstanceId!,
               password: _passwordController.text.trim(),
               enableBiometric: false,
             );
           }
-        } else {
-          print('Remember me not checked, clearing any saved credentials');
-          await _authService.clearCredentials();
         }
 
         Navigator.of(context).pushReplacement(

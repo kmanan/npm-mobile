@@ -19,6 +19,8 @@ dependencies:
   url_launcher: ^6.0.0
   local_auth: ^2.1.7
   encrypt: ^5.0.3
+  device_info_plus: ^10.1.0
+  package_info_plus: ^8.0.0
 
 dev_dependencies:
   flutter_test:

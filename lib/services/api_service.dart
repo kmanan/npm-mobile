@@ -3,12 +3,24 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/proxy_host.dart';
 import '../models/error_details.dart';
 import '../services/log_service.dart';
+import '../services/instance_service.dart';
 import 'dart:async';
 
 class ApiService {
   final Dio _dio = Dio();
-  final _storage = const FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+      keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
+      storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
   final _logService = LogService();
+  final _instanceService = InstanceService();
   bool isDemoMode = false;
 
   ApiService() {
@@ -18,6 +30,17 @@ class ApiService {
 
   Future<void> _loadSavedUrl() async {
     if (!isDemoMode) {
+      // Try to load from active instance first
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      if (activeInstanceId != null) {
+        final savedUrl =
+            await _storage.read(key: 'instance_${activeInstanceId}_server_url');
+        if (savedUrl != null) {
+          updateBaseUrl(savedUrl);
+          return;
+        }
+      }
+      // Fallback to legacy server_url for backward compatibility
       final savedUrl = await _storage.read(key: 'server_url');
       if (savedUrl != null) {
         updateBaseUrl(savedUrl);
@@ -43,7 +66,14 @@ class ApiService {
 
   Future<void> saveServerUrl(String url) async {
     if (!isDemoMode) {
-      await _storage.write(key: 'server_url', value: url);
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      if (activeInstanceId != null) {
+        await _storage.write(
+            key: 'instance_${activeInstanceId}_server_url', value: url);
+      } else {
+        // Fallback to legacy for backward compatibility
+        await _storage.write(key: 'server_url', value: url);
+      }
     }
   }
 
@@ -52,14 +82,69 @@ class ApiService {
   }
 
   Future<String?> getSavedServerUrl() async {
+    final activeInstanceId = await _instanceService.getActiveInstanceId();
+    if (activeInstanceId != null) {
+      return await _storage.read(
+          key: 'instance_${activeInstanceId}_server_url');
+    }
     return await _storage.read(key: 'server_url');
   }
 
   Future<bool> checkDemoMode() async {
-    final token = await _storage.read(key: 'auth_token');
+    final activeInstanceId = await _instanceService.getActiveInstanceId();
+    String? token;
+    if (activeInstanceId != null) {
+      token =
+          await _storage.read(key: 'instance_${activeInstanceId}_auth_token');
+    } else {
+      token = await _storage.read(key: 'auth_token');
+    }
     isDemoMode = token == 'demo_token';
     print('Checking demo mode: $isDemoMode'); // Debug print
     return isDemoMode;
+  }
+
+  /// Save auth token for a specific instance
+  Future<void> saveInstanceAuthToken(String instanceId, String token) async {
+    await _storage.write(
+        key: 'instance_${instanceId}_auth_token', value: token);
+  }
+
+  /// Get auth token for a specific instance
+  Future<String?> getInstanceAuthToken(String instanceId) async {
+    return await _storage.read(key: 'instance_${instanceId}_auth_token');
+  }
+
+  /// Clear auth token for a specific instance
+  Future<void> clearInstanceAuthToken(String instanceId) async {
+    await _storage.delete(key: 'instance_${instanceId}_auth_token');
+  }
+
+  /// Get active instance ID
+  Future<String?> getActiveInstanceId() async {
+    return await _instanceService.getActiveInstanceId();
+  }
+
+  /// Switch to a different instance
+  Future<void> switchInstance(String instanceId) async {
+    // Clear old authorization header
+    _dio.options.headers.remove('Authorization');
+
+    // Set new active instance
+    await _instanceService.setActiveInstanceId(instanceId);
+
+    // Load new instance URL
+    final newUrl =
+        await _storage.read(key: 'instance_${instanceId}_server_url');
+    if (newUrl != null) {
+      updateBaseUrl(newUrl);
+    }
+
+    // Load new instance token
+    final token = await getInstanceAuthToken(instanceId);
+    if (token != null && token != 'demo_token') {
+      _dio.options.headers['Authorization'] = 'Bearer $token';
+    }
   }
 
   Future<bool> login(String serverUrl, String email, String password) async {
@@ -125,7 +210,12 @@ class ApiService {
       String serverUrl, String email, String password) async {
     if (email == "demo@playstore.com" && password == "demopass123") {
       isDemoMode = true;
-      await _storage.write(key: 'auth_token', value: 'demo_token');
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      if (activeInstanceId != null) {
+        await saveInstanceAuthToken(activeInstanceId, 'demo_token');
+      } else {
+        await _storage.write(key: 'auth_token', value: 'demo_token');
+      }
       return true;
     }
 
@@ -250,9 +340,21 @@ class ApiService {
       }
 
       if (response.data != null && response.data['token'] != null) {
-        await _storage.write(key: 'auth_token', value: response.data['token']);
-        _dio.options.headers['Authorization'] =
-            'Bearer ${response.data['token']}';
+        final token = response.data['token'];
+        final activeInstanceId = await _instanceService.getActiveInstanceId();
+        print(
+            'Login successful - saving token. Active instance: $activeInstanceId');
+        if (activeInstanceId != null) {
+          await saveInstanceAuthToken(activeInstanceId, token);
+          print('Token saved for instance: $activeInstanceId');
+          // Verify it was saved
+          final verifyToken = await getInstanceAuthToken(activeInstanceId);
+          print('Token verification - saved correctly: ${verifyToken != null}');
+        } else {
+          await _storage.write(key: 'auth_token', value: token);
+          print('Token saved to legacy storage');
+        }
+        _dio.options.headers['Authorization'] = 'Bearer $token';
         return true;
       }
     }
@@ -330,9 +432,26 @@ class ApiService {
         ];
       }
 
+      // Ensure we have the base URL loaded
+      await _loadSavedUrl();
+
       // Only try API call if not in demo mode
-      final token = await _storage.read(key: 'auth_token');
-      if (token == null) throw Exception('No auth token found');
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      String? token;
+      if (activeInstanceId != null) {
+        token = await getInstanceAuthToken(activeInstanceId);
+        print(
+            'Got token for instance $activeInstanceId: ${token != null ? "yes" : "no"}');
+      } else {
+        token = await _storage.read(key: 'auth_token');
+        print('Got legacy token: ${token != null ? "yes" : "no"}');
+      }
+      if (token == null) {
+        print('No auth token found - cannot fetch proxy hosts');
+        throw Exception('No auth token found');
+      }
+
+      print('Making API call to ${_dio.options.baseUrl}/api/nginx/proxy-hosts');
 
       final response = await _dio.get(
         '/api/nginx/proxy-hosts',
@@ -341,10 +460,14 @@ class ApiService {
         ),
       );
 
+      print('Response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
+        print('Got ${data.length} proxy hosts');
         return data.map((json) => ProxyHost.fromJson(json)).toList();
       }
+      print('Non-200 response: ${response.statusCode}');
       return [];
     } catch (e) {
       print('Error fetching proxy hosts: $e');
@@ -359,7 +482,13 @@ class ApiService {
         return true;
       }
 
-      final token = await _storage.read(key: 'auth_token');
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      String? token;
+      if (activeInstanceId != null) {
+        token = await getInstanceAuthToken(activeInstanceId);
+      } else {
+        token = await _storage.read(key: 'auth_token');
+      }
       if (token == null) throw Exception('No auth token found');
 
       final response = await _dio.put(
@@ -395,7 +524,13 @@ class ApiService {
         return true;
       }
 
-      final token = await _storage.read(key: 'auth_token');
+      final activeInstanceId = await _instanceService.getActiveInstanceId();
+      String? token;
+      if (activeInstanceId != null) {
+        token = await getInstanceAuthToken(activeInstanceId);
+      } else {
+        token = await _storage.read(key: 'auth_token');
+      }
       if (token == null) throw Exception('No auth token found');
 
       final response = await _dio.put(
