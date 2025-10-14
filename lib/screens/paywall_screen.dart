@@ -144,18 +144,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _openPrivacyPolicy() async {
-    // TODO: Replace with your actual privacy policy URL
-    final uri = Uri.parse(
-        'https://github.com/yourusername/npm_phone_app/blob/main/privacy.md');
+    final uri = Uri.parse('https://krytonlabs.com/npm/privacy');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   Future<void> _openTermsOfService() async {
-    // TODO: Replace with your actual terms of service URL
-    final uri = Uri.parse(
-        'https://github.com/yourusername/npm_phone_app/blob/main/terms-of-service.md');
+    final uri = Uri.parse('https://krytonlabs.com/npm/terms');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
