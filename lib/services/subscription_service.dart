@@ -36,25 +36,33 @@ class SubscriptionService {
 
   /// Initialize the subscription service
   Future<void> initialize() async {
-    // Check if IAP is available
-    final bool available = await _iap.isAvailable();
-    if (!available) {
+    try {
+      // Check if IAP is available with timeout
+      final bool available = await _iap
+          .isAvailable()
+          .timeout(const Duration(seconds: 5), onTimeout: () => false);
+
+      if (!available) {
+        _status = SubscriptionStatus.free;
+        return;
+      }
+
+      // Load products with timeout
+      await _loadProducts().timeout(const Duration(seconds: 10));
+
+      // Restore purchases (check existing subscription) with timeout
+      await restorePurchases().timeout(const Duration(seconds: 10));
+
+      // Listen to purchase updates
+      _subscription = _iap.purchaseStream.listen(
+        _onPurchaseUpdate,
+        onDone: () => _subscription?.cancel(),
+        onError: (error) => debugPrint('Purchase stream error: $error'),
+      );
+    } catch (e) {
+      debugPrint('Initialization error: $e');
       _status = SubscriptionStatus.free;
-      return;
     }
-
-    // Load products
-    await _loadProducts();
-
-    // Restore purchases (check existing subscription)
-    await restorePurchases();
-
-    // Listen to purchase updates
-    _subscription = _iap.purchaseStream.listen(
-      _onPurchaseUpdate,
-      onDone: () => _subscription?.cancel(),
-      onError: (error) => debugPrint('Purchase stream error: $error'),
-    );
   }
 
   /// Load available products from stores
@@ -81,6 +89,8 @@ class SubscriptionService {
     final PurchaseParam purchaseParam = PurchaseParam(productDetails: product);
 
     try {
+      // Use buyNonConsumable for both iOS and Android subscriptions
+      // in_app_purchase treats subscriptions as non-consumables
       return await _iap.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (e) {
       debugPrint('Purchase error: $e');

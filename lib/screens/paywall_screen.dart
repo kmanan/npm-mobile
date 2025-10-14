@@ -29,22 +29,27 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
-    await _subscriptionService.initialize();
 
-    // Check trial eligibility
-    _isTrialEligible = await _subscriptionService.isTrialEligible();
+    try {
+      await _subscriptionService.initialize();
 
-    // Default to yearly product
-    if (_subscriptionService.products.isNotEmpty) {
-      _selectedProductId = _subscriptionService.products
-          .firstWhere(
-            (p) => p.id.contains('yearly'),
-            orElse: () => _subscriptionService.products.first,
-          )
-          .id;
+      // Check trial eligibility
+      _isTrialEligible = await _subscriptionService.isTrialEligible();
+
+      // Default to yearly product
+      if (_subscriptionService.products.isNotEmpty) {
+        _selectedProductId = _subscriptionService.products
+            .firstWhere(
+              (p) => p.id.contains('yearly'),
+              orElse: () => _subscriptionService.products.first,
+            )
+            .id;
+      }
+    } catch (e) {
+      debugPrint('Error loading products in paywall: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
-
-    setState(() => _isLoading = false);
   }
 
   String _getFeatureTitle() {
