@@ -245,7 +245,9 @@ class SubscriptionService {
     if (await isPremium()) {
       return currentInstanceCount < 50; // Premium limit
     }
-    return currentInstanceCount < 1; // Free limit
+    // Free users can only have 1 instance total
+    // If they have 1 or more, they cannot add another
+    return currentInstanceCount == 0;
   }
 
   /// Check if user can create hosts

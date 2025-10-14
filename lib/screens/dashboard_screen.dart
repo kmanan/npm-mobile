@@ -23,16 +23,35 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
+  final SubscriptionService _subscriptionService = SubscriptionService();
   List<ProxyHost> _proxyHosts = [];
   bool _isLoading = true;
   Set<int> _loadingHosts = {};
   NpmInstance? _activeInstance;
+  bool _isPremium = false;
+  bool _isOnTrial = false;
+  int _trialDaysRemaining = 0;
 
   @override
   void initState() {
     super.initState();
     _loadActiveInstance();
     _loadProxyHosts();
+    _loadSubscriptionStatus();
+  }
+
+  Future<void> _loadSubscriptionStatus() async {
+    final isPremium = await _subscriptionService.isPremium();
+    final isOnTrial = await _subscriptionService.isOnTrial();
+    final daysRemaining = await _subscriptionService.getTrialDaysRemaining();
+
+    if (mounted) {
+      setState(() {
+        _isPremium = isPremium;
+        _isOnTrial = isOnTrial;
+        _trialDaysRemaining = daysRemaining;
+      });
+    }
   }
 
   Future<void> _loadActiveInstance() async {
@@ -325,9 +344,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Nginx Mobile Dashboard',
-                      style: TextStyle(fontSize: 16),
+                    Row(
+                      children: [
+                        const Text(
+                          'Nginx Mobile Dashboard',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        if (_isPremium) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _isOnTrial ? Colors.orange : Colors.blue,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              _isOnTrial
+                                  ? 'Trial (${_trialDaysRemaining}d)'
+                                  : 'Premium',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (_activeInstance != null)
                       Text(

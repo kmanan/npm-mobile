@@ -177,19 +177,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Feature highlight
-                  const Icon(
-                    Icons.star,
-                    size: 64,
-                    color: Colors.amber,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _getFeatureTitle(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star,
+                        size: 32,
+                        color: Colors.amber,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _getFeatureTitle(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
