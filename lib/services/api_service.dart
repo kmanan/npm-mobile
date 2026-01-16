@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/proxy_host.dart';
 import '../models/error_details.dart';
+import '../models/login_result.dart';
 import '../services/log_service.dart';
 import '../services/instance_service.dart';
 import 'dart:async';
@@ -54,14 +55,151 @@ class ApiService {
 
   void updateBaseUrl(String url) {
     if (!isDemoMode) {
+      // Clean and normalize the URL
+      url = url.trim();
+      
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'http://$url';
       }
-      if (!url.contains(':')) {
-        url = '$url:81';
+      
+      // Extract host part to check for port
+      final uri = Uri.tryParse(url);
+      if (uri != null && (uri.port == 0 || uri.port == 80)) {
+        // No explicit port or default port, add NPM default port 81
+        url = '${uri.scheme}://${uri.host}:81${uri.path}';
       }
+      
       _dio.options.baseUrl = url;
     }
+  }
+
+  /// Validate server URL and return error message if invalid, null if valid
+  /// Also returns a suggested fix if possible
+  String? validateServerUrl(String url) {
+    if (url.trim().isEmpty) {
+      return 'Please enter a server URL';
+    }
+
+    url = url.trim();
+
+    // Check for common typos in protocol
+    if (url.startsWith('htpp://') || url.startsWith('htps://') || 
+        url.startsWith('htp://') || url.startsWith('httpss://')) {
+      return 'Invalid protocol. Did you mean "http://" or "https://"?';
+    }
+
+    // Check for missing colon in protocol
+    if (url.startsWith('http//') || url.startsWith('https//')) {
+      return 'Invalid URL format. Use "http://" or "https://" (note the colon)';
+    }
+
+    // Check for triple slashes
+    if (url.contains('///')) {
+      return 'Invalid URL format. Too many slashes in the URL';
+    }
+
+    // Remove protocol for further checks
+    String hostPart = url;
+    if (url.startsWith('http://')) {
+      hostPart = url.substring(7);
+    } else if (url.startsWith('https://')) {
+      hostPart = url.substring(8);
+    }
+
+    // Remove trailing path if any
+    if (hostPart.contains('/')) {
+      hostPart = hostPart.split('/').first;
+    }
+
+    // Check for spaces in URL
+    if (hostPart.contains(' ')) {
+      return 'URL cannot contain spaces. Remove any spaces from the address';
+    }
+
+    // Check for commas instead of dots (common typo)
+    if (hostPart.contains(',')) {
+      return 'Invalid IP address format. Use dots (.) not commas (,). Example: 192.168.1.1';
+    }
+
+    // Check for semicolons instead of colons for port
+    if (hostPart.contains(';')) {
+      return 'Invalid port format. Use colon (:) not semicolon (;). Example: 192.168.1.1:81';
+    }
+
+    // Extract host and port
+    String host = hostPart;
+    String? portStr;
+    
+    // Handle IPv6 addresses in brackets
+    if (hostPart.startsWith('[')) {
+      final closeBracket = hostPart.indexOf(']');
+      if (closeBracket == -1) {
+        return 'Invalid IPv6 address format. Missing closing bracket';
+      }
+      host = hostPart.substring(0, closeBracket + 1);
+      if (hostPart.length > closeBracket + 1 && hostPart[closeBracket + 1] == ':') {
+        portStr = hostPart.substring(closeBracket + 2);
+      }
+    } else if (hostPart.contains(':')) {
+      final parts = hostPart.split(':');
+      if (parts.length > 2) {
+        return 'Invalid URL format. Too many colons. For port, use format: hostname:port or IP:port';
+      }
+      host = parts[0];
+      portStr = parts.length > 1 ? parts[1] : null;
+    }
+
+    // Validate port if provided
+    if (portStr != null && portStr.isNotEmpty) {
+      final port = int.tryParse(portStr);
+      if (port == null) {
+        return 'Invalid port "$portStr". Port must be a number (e.g., 81, 443, 8080)';
+      }
+      if (port < 1 || port > 65535) {
+        return 'Invalid port $port. Port must be between 1 and 65535';
+      }
+    }
+
+    // Check if it looks like an IP address
+    if (RegExp(r'^\d').hasMatch(host)) {
+      // Starts with a digit, likely an IP address
+      final ipParts = host.split('.');
+      
+      if (ipParts.length != 4) {
+        if (ipParts.length < 4) {
+          return 'Incomplete IP address. IP addresses need 4 numbers separated by dots (e.g., 192.168.1.1)';
+        } else {
+          return 'Invalid IP address format. Too many parts. Use format: 192.168.1.1';
+        }
+      }
+
+      for (int i = 0; i < ipParts.length; i++) {
+        final part = ipParts[i];
+        if (part.isEmpty) {
+          return 'Invalid IP address. Missing number at position ${i + 1}. Example: 192.168.1.1';
+        }
+        final num = int.tryParse(part);
+        if (num == null) {
+          return 'Invalid IP address. "$part" is not a valid number. Each part must be 0-255';
+        }
+        if (num < 0 || num > 255) {
+          return 'Invalid IP address. $num is out of range. Each part must be between 0 and 255';
+        }
+      }
+    } else {
+      // Hostname validation
+      if (host.isEmpty) {
+        return 'Please enter a hostname or IP address';
+      }
+      
+      // Check for invalid characters in hostname
+      if (!RegExp(r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$').hasMatch(host) && 
+          host.length > 1) {
+        return 'Invalid hostname. Use only letters, numbers, dots, and hyphens';
+      }
+    }
+
+    return null; // URL is valid
   }
 
   Future<void> saveServerUrl(String url) async {
@@ -147,8 +285,21 @@ class ApiService {
     }
   }
 
-  Future<bool> login(String serverUrl, String email, String password) async {
+  Future<LoginResult> login(String serverUrl, String email, String password) async {
     try {
+      // Validate URL format first
+      final urlError = validateServerUrl(serverUrl);
+      if (urlError != null) {
+        await _logService.logAuthFailure(
+          errorMessage: urlError,
+          errorType: 'URL_VALIDATION_ERROR',
+          serverUrl: serverUrl,
+          responseData: 'URL failed validation before connection attempt',
+          email: email,
+        );
+        return LoginResult.failure(urlError);
+      }
+
       // Update and save the server URL first
       updateBaseUrl(serverUrl);
       await saveServerUrl(serverUrl);
@@ -170,7 +321,7 @@ class ApiService {
           responseData: 'Server did not respond to initial connection attempt',
           email: email,
         );
-        return false;
+        return LoginResult.failure('Could not reach server. Please verify the server is running and accessible.');
       }
 
       // If server is reachable, proceed with login attempt
@@ -190,7 +341,7 @@ class ApiService {
           responseData: 'Authentication process exceeded 10 second timeout',
           email: email,
         );
-        return false;
+        return LoginResult.failure('Authentication timed out. The server might be overloaded.');
       }
     } catch (e) {
       final errorDetails = _getErrorDetails(e, serverUrl);
@@ -201,12 +352,12 @@ class ApiService {
         responseData: errorDetails.data,
         email: email,
       );
-      return false;
+      return LoginResult.failure(errorDetails.message);
     }
   }
 
   // Move the existing login logic to a separate method
-  Future<bool> _performLogin(
+  Future<LoginResult> _performLogin(
       String serverUrl, String email, String password) async {
     if (email == "demo@playstore.com" && password == "demopass123") {
       isDemoMode = true;
@@ -216,7 +367,7 @@ class ApiService {
       } else {
         await _storage.write(key: 'auth_token', value: 'demo_token');
       }
-      return true;
+      return LoginResult.success('demo_token');
     }
 
     if (!isDemoMode) {
@@ -249,7 +400,7 @@ class ApiService {
             responseData: e.message ?? 'No error details available',
             email: email,
           );
-          return false;
+          return LoginResult.failure(errorMessage);
         }
         rethrow;
       }
@@ -269,9 +420,9 @@ class ApiService {
       final statusCode = response.statusCode ?? 0;
 
       if (statusCode != 200) {
-        String errorType;
-        String errorMessage;
-        String responseDataString;
+        String errorType = 'UNKNOWN_ERROR';
+        String errorMessage = 'Authentication failed';
+        String responseDataString = 'No response data';
 
         try {
           // Safely convert response data to string for logging
@@ -327,8 +478,9 @@ class ApiService {
           );
         } catch (e) {
           // If there's any error in parsing the response, log that instead
+          errorMessage = 'Error parsing server response';
           await _logService.logAuthFailure(
-            errorMessage: 'Error parsing server response',
+            errorMessage: errorMessage,
             errorType: 'PARSE_ERROR',
             statusCode: statusCode,
             serverUrl: serverUrl,
@@ -336,30 +488,137 @@ class ApiService {
             email: email,
           );
         }
-        return false;
+        return LoginResult.failure(errorMessage);
+      }
+
+      // Check if MFA is required (NPM v2.13.6+)
+      if (response.data is Map &&
+          response.data['requires_2fa'] == true &&
+          response.data['challenge_token'] != null) {
+        print('MFA required - challenge token received');
+        await _logService.logMfaEvent(
+          event: 'MFA_REQUIRED',
+          details: 'Server requires 2FA verification',
+          serverUrl: serverUrl,
+          email: email,
+          statusCode: statusCode,
+        );
+        return LoginResult.mfaRequired(response.data['challenge_token']);
       }
 
       if (response.data != null && response.data['token'] != null) {
         final token = response.data['token'];
-        final activeInstanceId = await _instanceService.getActiveInstanceId();
-        print(
-            'Login successful - saving token. Active instance: $activeInstanceId');
-        if (activeInstanceId != null) {
-          await saveInstanceAuthToken(activeInstanceId, token);
-          print('Token saved for instance: $activeInstanceId');
-          // Verify it was saved
-          final verifyToken = await getInstanceAuthToken(activeInstanceId);
-          print('Token verification - saved correctly: ${verifyToken != null}');
-        } else {
-          await _storage.write(key: 'auth_token', value: token);
-          print('Token saved to legacy storage');
-        }
-        _dio.options.headers['Authorization'] = 'Bearer $token';
-        return true;
+        await _saveAuthToken(token);
+        return LoginResult.success(token);
       }
     }
 
-    return false;
+    return LoginResult.failure('Login failed');
+  }
+
+  /// Save auth token to storage and set in Dio headers
+  Future<void> _saveAuthToken(String token) async {
+    final activeInstanceId = await _instanceService.getActiveInstanceId();
+    print('Login successful - saving token. Active instance: $activeInstanceId');
+    if (activeInstanceId != null) {
+      await saveInstanceAuthToken(activeInstanceId, token);
+      print('Token saved for instance: $activeInstanceId');
+      // Verify it was saved
+      final verifyToken = await getInstanceAuthToken(activeInstanceId);
+      print('Token verification - saved correctly: ${verifyToken != null}');
+    } else {
+      await _storage.write(key: 'auth_token', value: token);
+      print('Token saved to legacy storage');
+    }
+    _dio.options.headers['Authorization'] = 'Bearer $token';
+  }
+
+  /// Verify 2FA code and complete login (NPM v2.13.6+)
+  Future<LoginResult> verify2FA(String challengeToken, String code, {String? serverUrl, String? email}) async {
+    try {
+      await _logService.logMfaEvent(
+        event: 'MFA_VERIFY_ATTEMPT',
+        details: 'Attempting to verify 2FA code',
+        serverUrl: serverUrl ?? _dio.options.baseUrl,
+        email: email,
+      );
+
+      final response = await _dio.post(
+        '/api/tokens/2fa',
+        data: {
+          'challenge_token': challengeToken,
+          'code': code,
+        },
+        options: Options(
+          contentType: Headers.jsonContentType,
+          validateStatus: (_) => true,
+        ),
+      );
+
+      final statusCode = response.statusCode ?? 0;
+
+      if (statusCode == 200 && response.data != null && response.data['token'] != null) {
+        final token = response.data['token'];
+        await _saveAuthToken(token);
+        
+        await _logService.logMfaEvent(
+          event: 'MFA_VERIFY_SUCCESS',
+          details: '2FA verification successful',
+          serverUrl: serverUrl ?? _dio.options.baseUrl,
+          email: email,
+          statusCode: statusCode,
+        );
+        
+        return LoginResult.success(token);
+      }
+
+      // Handle errors
+      String errorMessage = 'Invalid verification code';
+      bool isExpired = false;
+      
+      if (response.data is Map) {
+        final message = response.data['message']?.toString() ?? '';
+        if (message.isNotEmpty) {
+          errorMessage = message;
+        }
+        // Check if challenge token expired
+        if (message.toLowerCase().contains('expired') || 
+            message.toLowerCase().contains('invalid token') ||
+            message.toLowerCase().contains('challenge')) {
+          errorMessage = 'Session expired. Please try logging in again.';
+          isExpired = true;
+        }
+      }
+
+      await _logService.logMfaEvent(
+        event: isExpired ? 'MFA_SESSION_EXPIRED' : 'MFA_VERIFY_FAILED',
+        details: errorMessage,
+        serverUrl: serverUrl ?? _dio.options.baseUrl,
+        email: email,
+        statusCode: statusCode,
+        additionalInfo: {
+          'response': response.data?.toString() ?? 'No response data',
+          'isExpired': isExpired,
+        },
+      );
+
+      return LoginResult.failure(errorMessage);
+    } catch (e) {
+      final errorMessage = 'Error verifying 2FA code: ${e.toString()}';
+      
+      await _logService.logMfaEvent(
+        event: 'MFA_VERIFY_ERROR',
+        details: errorMessage,
+        serverUrl: serverUrl ?? _dio.options.baseUrl,
+        email: email,
+        additionalInfo: {
+          'error': e.toString(),
+          'errorType': e.runtimeType.toString(),
+        },
+      );
+      
+      return LoginResult.failure(errorMessage);
+    }
   }
 
   ErrorDetails _getErrorDetails(dynamic error, String serverUrl) {

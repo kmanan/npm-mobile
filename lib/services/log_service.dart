@@ -177,6 +177,51 @@ ${_formatDeviceInfo(deviceInfo)}
     }
   }
 
+  /// Log MFA (Two-Factor Authentication) events
+  Future<void> logMfaEvent({
+    required String event,
+    required String details,
+    String? serverUrl,
+    String? email,
+    int? statusCode,
+    Map<String, dynamic>? additionalInfo,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = DateTime.now().toIso8601String();
+      final deviceInfo = await _getDeviceInfo();
+
+      final maskedEmail = email != null
+          ? '${email.split('@').first.replaceRange(1, null, '*****')}@${email.split('@').last}'
+          : 'Not provided';
+
+      final logEntry = '''
+$timestamp
+Type: MFA_EVENT
+Event: $event
+Details: $details
+Server URL: ${serverUrl ?? 'Unknown'}
+Status Code: ${statusCode ?? 'N/A'}
+Email: $maskedEmail
+${additionalInfo?.entries.map((e) => '${e.key}: ${e.value}').join('\n') ?? ''}
+
+DEVICE INFO:
+${_formatDeviceInfo(deviceInfo)}
+----------------------------------------''';
+
+      final logs = prefs.getStringList(_logKey) ?? [];
+      logs.add(logEntry);
+
+      if (logs.length > 50) {
+        logs.removeAt(0);
+      }
+
+      await prefs.setStringList(_logKey, logs);
+    } catch (e) {
+      print('Error writing to log: $e');
+    }
+  }
+
   Future<List<String>> getLogs() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_logKey) ?? [];

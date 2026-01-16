@@ -7,6 +7,7 @@ import '../services/log_service.dart';
 import '../services/subscription_service.dart';
 import '../utils/share_logs.dart';
 import '../models/npm_instance.dart';
+import '../models/login_result.dart';
 import 'main_screen.dart';
 import 'paywall_screen.dart';
 
@@ -351,19 +352,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 try {
                   // First test login
-                  final loginSuccess = await _apiService.login(
+                  final loginResult = await _apiService.login(
                     serverController.text.trim(),
                     emailController.text.trim(),
                     passwordController.text.trim(),
                   );
 
-                  if (!loginSuccess) {
+                  // Handle MFA required - close dialog and let user use main login
+                  if (loginResult.requiresMfa) {
                     if (context.mounted) {
+                      Navigator.pop(context, false);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                              'Could not connect to server. Please verify credentials.'),
-                          duration: Duration(seconds: 2),
+                              'This account has 2FA enabled. Please use the main login form.'),
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  if (!loginResult.success) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                              loginResult.error ?? 'Could not connect to server. Please verify credentials.'),
+                          duration: const Duration(seconds: 2),
                         ),
                       );
                     }
@@ -781,7 +797,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
 
-      final success = await _apiService.login(
+      final result = await _apiService.login(
         _serverController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text.trim(),
@@ -789,49 +805,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      if (success) {
-        if (_rememberMe && _selectedInstanceId != null) {
-          if (_biometricsAvailable) {
-            final biometricsEnabled = await _authService
-                .isInstanceBiometricEnabled(_selectedInstanceId!);
-            if (!biometricsEnabled) {
-              print('Showing biometric enable prompt after successful login');
-              await _showBiometricPrompt();
-            } else {
-              print(
-                  'Biometrics already enabled, updating instance without prompt');
-              await _authService.updateInstance(
-                instanceId: _selectedInstanceId!,
-                password: _passwordController.text.trim(),
-                enableBiometric: true,
-              );
-            }
-          } else {
-            print('Updating instance credentials without biometrics');
-            await _authService.updateInstance(
-              instanceId: _selectedInstanceId!,
-              password: _passwordController.text.trim(),
-              enableBiometric: false,
-            );
-          }
-        }
-
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const MainScreen(),
-          ),
+      // Handle MFA required (NPM v2.13.6+)
+      if (result.requiresMfa && result.challengeToken != null) {
+        final mfaResult = await _showMfaDialog(
+          result.challengeToken!,
+          serverUrl: _serverController.text.trim(),
+          email: _emailController.text.trim(),
         );
+        if (mfaResult == null) {
+          // User cancelled MFA dialog
+          setState(() => _isLoading = false);
+          return;
+        }
+        if (!mfaResult.success) {
+          // MFA failed - error already shown in dialog
+          setState(() => _isLoading = false);
+          return;
+        }
+        // MFA succeeded, continue with login success flow
+        await _handleLoginSuccess();
+        return;
+      }
+
+      if (result.success) {
+        await _handleLoginSuccess();
       } else {
         await _logService.logAuthFailure(
-          errorMessage: 'Authentication failed',
+          errorMessage: result.error ?? 'Authentication failed',
           errorType: 'AUTH_ERROR',
           statusCode: null,
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login failed. Please check your credentials.'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(result.error ?? 'Login failed. Please check your credentials.'),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -855,6 +863,171 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Handle successful login - save credentials and navigate
+  Future<void> _handleLoginSuccess() async {
+    if (_rememberMe && _selectedInstanceId != null) {
+      if (_biometricsAvailable) {
+        final biometricsEnabled = await _authService
+            .isInstanceBiometricEnabled(_selectedInstanceId!);
+        if (!biometricsEnabled) {
+          print('Showing biometric enable prompt after successful login');
+          await _showBiometricPrompt();
+        } else {
+          print('Biometrics already enabled, updating instance without prompt');
+          await _authService.updateInstance(
+            instanceId: _selectedInstanceId!,
+            password: _passwordController.text.trim(),
+            enableBiometric: true,
+          );
+        }
+      } else {
+        print('Updating instance credentials without biometrics');
+        await _authService.updateInstance(
+          instanceId: _selectedInstanceId!,
+          password: _passwordController.text.trim(),
+          enableBiometric: false,
+        );
+      }
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const MainScreen(),
+        ),
+      );
+    }
+  }
+
+  /// Show MFA verification dialog
+  /// Returns LoginResult on success/failure, null if cancelled
+  Future<LoginResult?> _showMfaDialog(String challengeToken, {String? serverUrl, String? email}) async {
+    final codeController = TextEditingController();
+    bool isVerifying = false;
+    String? errorMessage;
+
+    return await showDialog<LoginResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Two-Factor Authentication'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the 6-digit code from your authenticator app.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: codeController,
+                decoration: InputDecoration(
+                  labelText: 'Verification Code',
+                  hintText: '000000',
+                  border: const OutlineInputBorder(),
+                  errorText: errorMessage,
+                ),
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+                autofocus: true,
+                enabled: !isVerifying,
+                onChanged: (value) {
+                  if (errorMessage != null) {
+                    setState(() => errorMessage = null);
+                  }
+                },
+              ),
+              if (isVerifying)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isVerifying ? null : () => Navigator.pop(context, null),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: isVerifying
+                  ? null
+                  : () async {
+                      final code = codeController.text.trim();
+                      if (code.length != 6) {
+                        setState(() => errorMessage = 'Please enter a 6-digit code');
+                        return;
+                      }
+
+                      setState(() {
+                        isVerifying = true;
+                        errorMessage = null;
+                      });
+
+                      final result = await _apiService.verify2FA(
+                        challengeToken, 
+                        code,
+                        serverUrl: serverUrl,
+                        email: email,
+                      );
+
+                      if (result.success) {
+                        if (context.mounted) {
+                          Navigator.pop(context, result);
+                        }
+                      } else {
+                        // Check if challenge token expired - auto retry login
+                        if (result.error?.contains('expired') == true ||
+                            result.error?.contains('Session expired') == true) {
+                          if (context.mounted) {
+                            Navigator.pop(context, null);
+                          }
+                          // Show message and retry login
+                          if (mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Session expired. Retrying login...'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            // Retry login after a short delay
+                            Future.delayed(const Duration(milliseconds: 500), () {
+                              if (mounted) {
+                                _handleLogin();
+                              }
+                            });
+                          }
+                          return;
+                        }
+
+                        setState(() {
+                          isVerifying = false;
+                          errorMessage = result.error ?? 'Invalid code. Please try again.';
+                        });
+                      }
+                    },
+              child: const Text('VERIFY'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
