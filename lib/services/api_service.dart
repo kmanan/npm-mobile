@@ -750,11 +750,13 @@ class ApiService {
       }
       if (token == null) throw Exception('No auth token found');
 
-      final response = await _dio.put(
-        '/api/nginx/proxy-hosts/$hostId',
-        data: {
-          'enabled': enabled,
-        },
+      // Use dedicated enable/disable endpoints that properly regenerate nginx config
+      final endpoint = enabled
+          ? '/api/nginx/proxy-hosts/$hostId/enable'
+          : '/api/nginx/proxy-hosts/$hostId/disable';
+
+      final response = await _dio.post(
+        endpoint,
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
         ),

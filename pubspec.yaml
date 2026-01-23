@@ -2,7 +2,7 @@ name: npm_phone_app
 description: "Nginx Mobile Dashboard - A mobile client for Nginx Proxy Manager"
 publish_to: 'none'
 
-version: 2.1.0+13
+version: 2.2.0+14
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -22,6 +22,7 @@ dependencies:
   device_info_plus: ^10.1.0
   package_info_plus: ^8.0.0
   in_app_purchase: ^3.1.13
+  share_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:
