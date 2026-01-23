@@ -19,6 +19,13 @@ android {
     compileSdkVersion flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
+    // Enable 16 KB page size support (required for Google Play from Nov 2025)
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
