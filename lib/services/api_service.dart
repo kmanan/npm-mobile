@@ -287,7 +287,19 @@ class ApiService {
 
   Future<LoginResult> login(String serverUrl, String email, String password) async {
     try {
-      // Validate URL format first
+      // Check for demo mode FIRST, before any server validation
+      if (email == "demo@playstore.com" && password == "demopass123") {
+        isDemoMode = true;
+        final activeInstanceId = await _instanceService.getActiveInstanceId();
+        if (activeInstanceId != null) {
+          await saveInstanceAuthToken(activeInstanceId, 'demo_token');
+        } else {
+          await _storage.write(key: 'auth_token', value: 'demo_token');
+        }
+        return LoginResult.success('demo_token');
+      }
+
+      // Validate URL format first (only for non-demo logins)
       final urlError = validateServerUrl(serverUrl);
       if (urlError != null) {
         await _logService.logAuthFailure(
@@ -359,17 +371,7 @@ class ApiService {
   // Move the existing login logic to a separate method
   Future<LoginResult> _performLogin(
       String serverUrl, String email, String password) async {
-    if (email == "demo@playstore.com" && password == "demopass123") {
-      isDemoMode = true;
-      final activeInstanceId = await _instanceService.getActiveInstanceId();
-      if (activeInstanceId != null) {
-        await saveInstanceAuthToken(activeInstanceId, 'demo_token');
-      } else {
-        await _storage.write(key: 'auth_token', value: 'demo_token');
-      }
-      return LoginResult.success('demo_token');
-    }
-
+    // Note: Demo mode is now handled in login() before this method is called
     if (!isDemoMode) {
       // First, validate the URL is reachable
       try {
