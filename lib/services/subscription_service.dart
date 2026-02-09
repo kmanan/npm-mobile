@@ -37,7 +37,9 @@ class SubscriptionService {
   // Listeners
   final List<VoidCallback> _listeners = [];
 
-  /// Initialize the subscription service
+  /// Initialize the subscription service.
+  /// Uses fast local checks only — no network calls, no Apple ID prompts.
+  /// Product loading happens in the background.
   Future<void> initialize() async {
     try {
       // Check if IAP is available with timeout
@@ -59,15 +61,16 @@ class SubscriptionService {
             debugPrint('[Subscription] Purchase stream error: $error'),
       );
 
-      // Load products with timeout
-      await _loadProducts().timeout(const Duration(seconds: 10));
+      // Load products in the background — don't block startup
+      _loadProducts().timeout(const Duration(seconds: 10)).catchError((e) {
+        debugPrint('[Subscription] Product loading failed: $e');
+      });
 
-      // Restore purchases (check existing subscription) with timeout
+      // Fast local subscription check — no network, no prompts
       try {
-        await restorePurchases().timeout(const Duration(seconds: 15));
+        await _checkSubscriptionLocal().timeout(const Duration(seconds: 5));
       } catch (e) {
-        debugPrint('[Subscription] Restore during init failed: $e');
-        // Non-fatal during init — user can retry via Restore button
+        debugPrint('[Subscription] Local check during init failed: $e');
       }
     } catch (e) {
       debugPrint('[Subscription] Initialization error: $e');
@@ -108,7 +111,80 @@ class SubscriptionService {
     }
   }
 
-  /// Restore previous purchases.
+  /// Fast local subscription check — no network calls, no prompts.
+  /// Reads cached transaction data on iOS, checks SharedPreferences + trial.
+  /// Called during initialize() for a fast, silent startup check.
+  Future<bool> _checkSubscriptionLocal() async {
+    if (Platform.isIOS) {
+      return await _checkSubscriptionLocalIOS();
+    } else {
+      return await _checkSubscriptionLocalAndroid();
+    }
+  }
+
+  /// iOS local check: reads cached SK2 transactions (no network, no Apple ID prompt).
+  Future<bool> _checkSubscriptionLocalIOS() async {
+    debugPrint('[Subscription] iOS local check: querying SK2Transaction.transactions()...');
+
+    final List<SK2Transaction> transactions = await SK2Transaction.transactions();
+
+    debugPrint('[Subscription] iOS local check: found ${transactions.length} transaction(s)');
+
+    bool foundActive = false;
+
+    for (final transaction in transactions) {
+      if (transaction.productId == monthlyProductId ||
+          transaction.productId == yearlyProductId) {
+        if (transaction.expirationDate != null) {
+          final expirationDate = DateTime.tryParse(transaction.expirationDate!);
+          if (expirationDate != null && expirationDate.isAfter(DateTime.now())) {
+            debugPrint('[Subscription] iOS local check: found active subscription '
+                '${transaction.productId}, expires ${transaction.expirationDate}');
+            foundActive = true;
+            break;
+          } else {
+            debugPrint('[Subscription] iOS local check: found expired subscription '
+                '${transaction.productId}, expired ${transaction.expirationDate}');
+          }
+        }
+      }
+    }
+
+    if (foundActive) {
+      await _grantPremiumAccess();
+      _status = SubscriptionStatus.premium;
+      _notifyListeners();
+    } else {
+      await _checkTrialStatus();
+    }
+
+    return foundActive;
+  }
+
+  /// Android local check: reads cached premium status from SharedPreferences
+  /// and verifies trial validity. The purchase stream listener (set up in
+  /// initialize) will pick up any new/restored purchases automatically.
+  Future<bool> _checkSubscriptionLocalAndroid() async {
+    debugPrint('[Subscription] Android local check: reading cached status...');
+
+    final prefs = await SharedPreferences.getInstance();
+    final isPremiumCached = prefs.getBool('is_premium') ?? false;
+
+    if (isPremiumCached) {
+      debugPrint('[Subscription] Android local check: cached premium = true');
+      _status = SubscriptionStatus.premium;
+      _notifyListeners();
+      return true;
+    }
+
+    // Not premium — check if there's an active trial
+    await _checkTrialStatus();
+    return _status == SubscriptionStatus.trial;
+  }
+
+  /// Restore previous purchases (user-initiated, full server sync).
+  /// On iOS: calls AppStore().sync() which may trigger Apple ID auth.
+  /// On Android: calls restorePurchases() via the purchase stream.
   /// Returns true if an active subscription was found, false otherwise.
   /// Throws on error so the UI can display the failure.
   Future<bool> restorePurchases() async {
@@ -124,8 +200,8 @@ class SubscriptionService {
     }
   }
 
-  /// iOS restore: uses StoreKit 2 native APIs which are reliable, unlike
-  /// restorePurchases() on the purchase stream (see flutter/flutter#160498).
+  /// iOS restore (user-initiated): syncs with App Store then checks transactions.
+  /// This may trigger an Apple ID sign-in prompt — only call from Restore button.
   Future<bool> _restorePurchasesIOS() async {
     debugPrint('[Subscription] iOS restore: calling AppStore.sync()...');
 
@@ -173,52 +249,24 @@ class SubscriptionService {
     return foundActive;
   }
 
-  /// Android restore: uses restorePurchases() via the purchase stream,
-  /// which works reliably on Google Play Billing.
+  /// Android restore (user-initiated): queries Google Play via the purchase stream.
+  /// Only call from the Restore button.
   Future<bool> _restorePurchasesAndroid() async {
     debugPrint('[Subscription] Android restore: calling restorePurchases()...');
 
-    // Use a Completer to wait for the purchase stream to deliver results
-    final Completer<bool> completer = Completer<bool>();
-
-    // Temporary listener to capture restored purchases
-    late StreamSubscription<List<PurchaseDetails>> restoreSubscription;
     bool foundActive = false;
 
-    restoreSubscription = _iap.purchaseStream.listen(
-      (List<PurchaseDetails> purchases) async {
-        for (final purchase in purchases) {
-          if (purchase.status == PurchaseStatus.purchased ||
-              purchase.status == PurchaseStatus.restored) {
-            final bool valid = await _verifyPurchase(purchase);
-            if (valid) {
-              foundActive = true;
-              await _grantPremiumAccess();
-              _status = SubscriptionStatus.premium;
-              _notifyListeners();
-            }
-          }
-
-          // Complete the purchase (required by both platforms)
-          if (purchase.pendingCompletePurchase) {
-            await _iap.completePurchase(purchase);
-          }
-        }
-      },
-      onDone: () {
-        if (!completer.isCompleted) completer.complete(foundActive);
-      },
-      onError: (error) {
-        debugPrint('[Subscription] Android restore stream error: $error');
-        if (!completer.isCompleted) completer.complete(false);
-      },
-    );
-
+    // Use the existing _onPurchaseUpdate listener (set up in initialize)
+    // to handle restored purchases. Just trigger the restore.
     await _iap.restorePurchases();
 
     // Give the purchase stream a reasonable window to deliver events
     await Future.delayed(const Duration(seconds: 5));
-    await restoreSubscription.cancel();
+
+    // Check if _onPurchaseUpdate granted premium during the wait
+    if (_status == SubscriptionStatus.premium) {
+      foundActive = true;
+    }
 
     if (!foundActive) {
       // No active subscription — still check for an active trial

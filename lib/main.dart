@@ -5,9 +5,9 @@ import 'services/subscription_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize subscription service
+  // Initialize subscription service (fast local check only, no network blocking)
   final subscriptionService = SubscriptionService();
-  await subscriptionService.initialize();
+  subscriptionService.initialize();
 
   runApp(const NginxProxyManagerApp());
 }

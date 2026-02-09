@@ -81,9 +81,38 @@ This is not a code bug. It's how Apple's StoreKit works:
 
 To test restore on TestFlight, you need a sandbox Apple ID with a sandbox purchase.
 
+### 8. `AppStore().sync()` ran on every app launch — Apple ID prompt on every startup
+
+**File:** `lib/services/subscription_service.dart` — `initialize()` and `_restorePurchasesIOS()`
+
+After fixing restore (issues 1–7), `initialize()` called `restorePurchases()` on every launch. On iOS, that meant `AppStore().sync()` ran every single startup — for all users, including free users with no subscription. `AppStore().sync()` is designed for user-initiated restores and can trigger an Apple ID sign-in prompt. Users reported being asked to sign into their Apple account after updating the app.
+
+On Android, the same `initialize()` called `_iap.restorePurchases()` every launch, which hit Google Play servers and added a hard 5-second `Future.delayed()` to every startup. It also created a duplicate purchase stream listener on top of the one already set up in `initialize()`.
+
+**Fix:** Split the subscription check into two paths:
+
+1. **`_checkSubscriptionLocal()`** — fast, offline, no prompts. Called during `initialize()`.
+   - **iOS:** Reads cached `SK2Transaction.transactions()` directly. Apple keeps this updated in the background — no need for `sync()`.
+   - **Android:** Reads cached `SharedPreferences` premium status + checks trial validity. The purchase stream listener (already set up in `initialize()`) handles any new events automatically.
+
+2. **`restorePurchases()`** — full server sync, user-initiated only. Called only from the "Restore Purchases" button.
+   - **iOS:** `AppStore().sync()` + `SK2Transaction.transactions()` (Apple ID prompt expected and acceptable here).
+   - **Android:** `_iap.restorePurchases()` using the existing stream listener (no duplicate listener).
+
+Also removed the `await` on `subscriptionService.initialize()` in `main.dart` so the app doesn't block on startup, and moved product loading to the background.
+
 ---
 
-## Files Changed
+## Files Changed (Round 2 — Feb 2026)
+
+| File | Change |
+|------|--------|
+| `lib/services/subscription_service.dart` | Split into local check (`_checkSubscriptionLocal()`) for startup and full restore (`restorePurchases()`) for user-initiated only. Removed `AppStore().sync()` from startup path. Removed duplicate Android stream listener. Background product loading. |
+| `lib/main.dart` | Removed `await` on `subscriptionService.initialize()` — no longer blocks app startup |
+
+---
+
+## Files Changed (Round 1 — Feb 2026)
 
 | File | Change |
 |------|--------|
@@ -101,3 +130,5 @@ To test restore on TestFlight, you need a sandbox Apple ID with a sandbox purcha
 3. `SharedPreferences` is not a source of truth for subscription status — it's a cache. The store is the source of truth.
 4. TestFlight is sandbox. Production purchases don't exist there. You must test with sandbox accounts or release to the App Store.
 5. A "Restore Purchases" button that does nothing with no feedback is worse than not having the button at all.
+6. `AppStore().sync()` is for **user-initiated restores only** — never call it on startup. Use `SK2Transaction.transactions()` (local cached data) for launch-time checks. Calling `sync()` every launch prompts users to sign into their Apple account.
+7. Don't block `main()` with network calls. Subscription init should be fast and local; product loading can happen in the background.
