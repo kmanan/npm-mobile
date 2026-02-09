@@ -123,28 +123,38 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Future<void> _handleRestore() async {
     setState(() => _isLoading = true);
 
-    await _subscriptionService.restorePurchases();
+    try {
+      final bool found = await _subscriptionService.restorePurchases();
 
-    // Wait a moment for restore to process
-    await Future.delayed(const Duration(seconds: 2));
-
-    final isPremium = await _subscriptionService.isPremium();
-
-    if (isPremium && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Premium subscription restored!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pop(context, true);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No previous subscription found'),
-        ),
-      );
-      setState(() => _isLoading = false);
+      if (found && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Purchases restored successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No active subscription found. Make sure you\'re signed in '
+              'with the account you used to subscribe.',
+            ),
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Restore failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
     }
   }
 

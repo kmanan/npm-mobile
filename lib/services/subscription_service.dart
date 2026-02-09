@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
@@ -43,24 +46,31 @@ class SubscriptionService {
           .timeout(const Duration(seconds: 5), onTimeout: () => false);
 
       if (!available) {
+        debugPrint('[Subscription] IAP not available');
         _status = SubscriptionStatus.free;
         return;
       }
+
+      // Listen to purchase updates (must be set up before any purchase/restore)
+      _subscription = _iap.purchaseStream.listen(
+        _onPurchaseUpdate,
+        onDone: () => _subscription?.cancel(),
+        onError: (error) =>
+            debugPrint('[Subscription] Purchase stream error: $error'),
+      );
 
       // Load products with timeout
       await _loadProducts().timeout(const Duration(seconds: 10));
 
       // Restore purchases (check existing subscription) with timeout
-      await restorePurchases().timeout(const Duration(seconds: 10));
-
-      // Listen to purchase updates
-      _subscription = _iap.purchaseStream.listen(
-        _onPurchaseUpdate,
-        onDone: () => _subscription?.cancel(),
-        onError: (error) => debugPrint('Purchase stream error: $error'),
-      );
+      try {
+        await restorePurchases().timeout(const Duration(seconds: 15));
+      } catch (e) {
+        debugPrint('[Subscription] Restore during init failed: $e');
+        // Non-fatal during init — user can retry via Restore button
+      }
     } catch (e) {
-      debugPrint('Initialization error: $e');
+      debugPrint('[Subscription] Initialization error: $e');
       _status = SubscriptionStatus.free;
     }
   }
@@ -98,18 +108,124 @@ class SubscriptionService {
     }
   }
 
-  /// Restore previous purchases
-  Future<void> restorePurchases() async {
+  /// Restore previous purchases.
+  /// Returns true if an active subscription was found, false otherwise.
+  /// Throws on error so the UI can display the failure.
+  Future<bool> restorePurchases() async {
     try {
-      await _iap.restorePurchases();
-
-      // Also check for active trial
-      await _checkTrialStatus();
-
-      // Purchase stream will handle the restored purchases
+      if (Platform.isIOS) {
+        return await _restorePurchasesIOS();
+      } else {
+        return await _restorePurchasesAndroid();
+      }
     } catch (e) {
-      debugPrint('Restore error: $e');
+      debugPrint('[Subscription] Restore error: $e');
+      rethrow; // Let the UI handle and display the error
     }
+  }
+
+  /// iOS restore: uses StoreKit 2 native APIs which are reliable, unlike
+  /// restorePurchases() on the purchase stream (see flutter/flutter#160498).
+  Future<bool> _restorePurchasesIOS() async {
+    debugPrint('[Subscription] iOS restore: calling AppStore.sync()...');
+
+    // Sync transaction data with the App Store (triggers Apple ID auth)
+    await AppStore().sync();
+
+    debugPrint('[Subscription] iOS restore: querying SK2Transaction.transactions()...');
+
+    // Directly query all transactions — no purchase stream race condition
+    final List<SK2Transaction> transactions = await SK2Transaction.transactions();
+
+    debugPrint('[Subscription] iOS restore: found ${transactions.length} transaction(s)');
+
+    bool foundActive = false;
+
+    for (final transaction in transactions) {
+      // Check if this is one of our subscription products
+      if (transaction.productId == monthlyProductId ||
+          transaction.productId == yearlyProductId) {
+        // Check if the subscription has a valid expiration date
+        if (transaction.expirationDate != null) {
+          final expirationDate = DateTime.tryParse(transaction.expirationDate!);
+          if (expirationDate != null && expirationDate.isAfter(DateTime.now())) {
+            debugPrint('[Subscription] iOS restore: found active subscription '
+                '${transaction.productId}, expires ${transaction.expirationDate}');
+            foundActive = true;
+            break;
+          } else {
+            debugPrint('[Subscription] iOS restore: found expired subscription '
+                '${transaction.productId}, expired ${transaction.expirationDate}');
+          }
+        }
+      }
+    }
+
+    if (foundActive) {
+      await _grantPremiumAccess();
+      _status = SubscriptionStatus.premium;
+      _notifyListeners();
+    } else {
+      // No active subscription — still check for an active trial
+      await _checkTrialStatus();
+    }
+
+    return foundActive;
+  }
+
+  /// Android restore: uses restorePurchases() via the purchase stream,
+  /// which works reliably on Google Play Billing.
+  Future<bool> _restorePurchasesAndroid() async {
+    debugPrint('[Subscription] Android restore: calling restorePurchases()...');
+
+    // Use a Completer to wait for the purchase stream to deliver results
+    final Completer<bool> completer = Completer<bool>();
+
+    // Temporary listener to capture restored purchases
+    late StreamSubscription<List<PurchaseDetails>> restoreSubscription;
+    bool foundActive = false;
+
+    restoreSubscription = _iap.purchaseStream.listen(
+      (List<PurchaseDetails> purchases) async {
+        for (final purchase in purchases) {
+          if (purchase.status == PurchaseStatus.purchased ||
+              purchase.status == PurchaseStatus.restored) {
+            final bool valid = await _verifyPurchase(purchase);
+            if (valid) {
+              foundActive = true;
+              await _grantPremiumAccess();
+              _status = SubscriptionStatus.premium;
+              _notifyListeners();
+            }
+          }
+
+          // Complete the purchase (required by both platforms)
+          if (purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
+          }
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) completer.complete(foundActive);
+      },
+      onError: (error) {
+        debugPrint('[Subscription] Android restore stream error: $error');
+        if (!completer.isCompleted) completer.complete(false);
+      },
+    );
+
+    await _iap.restorePurchases();
+
+    // Give the purchase stream a reasonable window to deliver events
+    await Future.delayed(const Duration(seconds: 5));
+    await restoreSubscription.cancel();
+
+    if (!foundActive) {
+      // No active subscription — still check for an active trial
+      await _checkTrialStatus();
+    }
+
+    return foundActive;
   }
 
   /// Handle purchase updates
