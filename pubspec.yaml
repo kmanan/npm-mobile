@@ -22,7 +22,7 @@ dependencies:
   device_info_plus: ^10.1.0
   package_info_plus: ^8.0.0
   in_app_purchase: ^3.2.3
-  in_app_purchase_storekit: ^0.4.7
+  in_app_purchase_storekit: ^0.4.4
   share_plus: ^10.0.0
 
 dev_dependencies:
