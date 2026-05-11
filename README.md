@@ -56,6 +56,10 @@ Fully built using Cursor.AI
 - Built with [Flutter](https://flutter.dev)
 - Cursor.AI (https://cursor.ai)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=kmanan/npm-mobile&type=Date)](https://star-history.com/#kmanan/npm-mobile&Date)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
